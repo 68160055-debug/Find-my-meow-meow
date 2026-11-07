@@ -286,6 +286,7 @@ $stmt->close();
         </div>
 
       // แก้ไขเพศ
+    <?php 
     if (isset($_POST['update_gender'])) {
         $gender = trim((string)($_POST['gender'] ?? ''));
         $allowed_genders = ['female', 'male', 'other'];
@@ -302,9 +303,9 @@ $stmt->close();
             $error = 'กรุณาเลือกเพศที่ถูกต้อง';
         }
     }
-      
-    // ดึงข้อมูลผู้ใช้ปัจจุบัน
-$stmt = $conn->prepare("SELECT full_name, email, avatar, gender FROM users WHERE id = ? LIMIT 1");
+ // ดึงข้อมูลผู้ใช้ปัจจุบัน
+    $stmt = $conn->prepare("SELECT full_name, email, avatar, gender FROM users WHERE id = ? LIMIT 1");
+
         <!-- แก้ไขเพศ -->
         <div class="info-group">
             <label>เพศ (Gender)</label>
@@ -320,6 +321,8 @@ $stmt = $conn->prepare("SELECT full_name, email, avatar, gender FROM users WHERE
                 </div>
             </form>
         </div>
+?>
+
 
         <!-- แก้ไขอายุ -->
         <div class="info-group">
