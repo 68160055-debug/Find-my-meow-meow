@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Database Management | Week: PHP Login / Logout + GitHub
 Based on last week's Resume CRUD Lab
 This code extends the previous CRUD project, retaining skills.php, skill_create.php, skill_edit.php, skill_delete.php and index.php.
@@ -63,3 +64,7 @@ Grading (100 points)
 INSERT 25, SELECT+UPDATE 30, DELETE 25, screenshots/testing 10, Git commits 10.
 
 Starter: fill all TODO SQL queries before submitting.
+=======
+# Find-my-meow-meow
+เว็บไซต์ประกาศหาแมวและหาบ้านให้แมว
+>>>>>>> aa19d28dfe5e425365dc16c65600443702af79aa
