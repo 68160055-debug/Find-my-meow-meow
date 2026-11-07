@@ -7,14 +7,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  if($pid===0 || $name==='' || mb_strlen($name)>120 || !in_array($level,['Beginner','Intermediate','Advanced'],true))$error='Please enter a valid skill and level.';
  else{
  // TODO 1: Fill SQL INSERT. Keep placeholders, never concatenate input values.
-<<<<<<< HEAD
+
  $sql='INSERT INTO skill (profile_id, skill_name, skill_level) VALUES (?, ?, ?)';
 =======
  $sql='/* TODO INSERT: specify table, columns and VALUES placeholders */ SELECT 1';
 
  $sql = "INSERT INTO skill (profile_id, skill_name, skill_level) VALUES (?, ?, ?)";
 
->>>>>>> 6b8792f2f8d3b414c8e32e7a1d95e37703a37afc
  $stmt=mysqli_prepare($conn,$sql);
  if(!$stmt){$error='SQL not ready: review TODO 1.';}
  else{mysqli_stmt_bind_param($stmt,'iss',$pid,$name,$level);if(mysqli_stmt_execute($stmt)){mysqli_stmt_close($stmt);header('Location: skills.php?success=created');exit;} $error='Insert failed. Review the SQL.';mysqli_stmt_close($stmt);}

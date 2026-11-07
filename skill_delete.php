@@ -4,17 +4,16 @@ $id=valid_id($_GET['id']??$_POST['id']??null);$pid=profile_id($conn);$error='';
 if(!$id){http_response_code(400);exit('Invalid record ID');}
 if($_SERVER['REQUEST_METHOD']==='POST'){
  verify_csrf();
-<<<<<<< HEAD
+
  // TODO 3: Fill DELETE SQL with id AND profile_id conditions.
  $sql='DELETE FROM skill WHERE id = ? AND profile_id = ?';
-=======
+
 
  // TODO 3: Fill DELETE SQL with id AND profile_id conditions.
  $sql='/* TODO DELETE: specify WHERE id/profile_id */ SELECT 1';
  $sql = "DELETE FROM skill WHERE id = ? AND profile_id = ?";
 
  
->>>>>>> 6b8792f2f8d3b414c8e32e7a1d95e37703a37afc
  $stmt=mysqli_prepare($conn,$sql);
  if(!$stmt)$error='SQL not ready: review TODO 3.';
  else{mysqli_stmt_bind_param($stmt,'ii',$id,$pid);if(mysqli_stmt_execute($stmt)){mysqli_stmt_close($stmt);header('Location: skills.php?success=deleted');exit;} $error='Delete failed.';mysqli_stmt_close($stmt);}

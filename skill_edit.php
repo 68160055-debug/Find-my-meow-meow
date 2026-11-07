@@ -1,20 +1,19 @@
-<<<<<<< HEAD
-=======
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
->>>>>>> 6b8792f2f8d3b414c8e32e7a1d95e37703a37afc
+
 <?php
 require 'crud_bootstrap.php';
 $id=valid_id($_GET['id']??$_POST['id']??null);$pid=profile_id($conn);$error='';$row=null;
 if(!$id){http_response_code(400);exit('Invalid record ID');}
-<<<<<<< HEAD
+
 // TODO 2a: Fill SELECT SQL for exactly one record belonging to the profile.
 $sql='SELECT skill_name, skill_level FROM skill WHERE id = ? AND profile_id = ?';
 $stmt=mysqli_prepare($conn,$sql);
 if($stmt){mysqli_stmt_bind_param($stmt,'ii',$id,$pid);mysqli_stmt_execute($stmt);mysqli_stmt_bind_result($stmt,$oldName,$oldLevel);if(mysqli_stmt_fetch($stmt))$row=['skill_name'=>$oldName,'skill_level'=>$oldLevel];mysqli_stmt_close($stmt);}
-=======
+
 
 // TODO 2a: Fill SELECT SQL for exactly one record belonging to the profile.
 $sql='/* TODO SELECT: specify columns and WHERE id/profile_id */ SELECT 1';
@@ -32,27 +31,25 @@ if(mysqli_stmt_fetch($stmt)){
 
 }
  
-   
 
 
->>>>>>> 6b8792f2f8d3b414c8e32e7a1d95e37703a37afc
 if(!$row){http_response_code(404);exit('Record not found or TODO 2a unfinished.');}
 $name=$row['skill_name'];$level=$row['skill_level'];
 if($_SERVER['REQUEST_METHOD']==='POST'){
  verify_csrf();$name=trim((string)($_POST['skill_name']??''));$level=trim((string)($_POST['skill_level']??''));
  if($name===''||mb_strlen($name)>120||!in_array($level,['Beginner','Intermediate','Advanced'],true))$error='Please enter valid values.';
  else{
-<<<<<<< HEAD
+
  // TODO 2b: Fill UPDATE SQL with placeholders AND safe WHERE clause.
  $sql='UPDATE skill SET skill_name = ?, skill_level = ? WHERE id = ? AND profile_id = ?';
-=======
+
 
  // TODO 2b: Fill UPDATE SQL with placeholders AND safe WHERE clause.
  $sql='/* TODO UPDATE: specify SET and WHERE id/profile_id */ SELECT 1';
  $sql = "UPDATE skill SET skill_name = ?, skill_level = ? WHERE id = ? AND profile_id = ?";
 
 
->>>>>>> 6b8792f2f8d3b414c8e32e7a1d95e37703a37afc
+
  $stmt=mysqli_prepare($conn,$sql);
  if(!$stmt)$error='SQL not ready: review TODO 2b.';
  else{mysqli_stmt_bind_param($stmt,'ssii',$name,$level,$id,$pid);if(mysqli_stmt_execute($stmt)){mysqli_stmt_close($stmt);header('Location: skills.php?success=updated');exit;} $error='Update failed.';mysqli_stmt_close($stmt);}

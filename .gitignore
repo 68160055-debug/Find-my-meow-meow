@@ -1,17 +1,23 @@
-<<<<<<< HEAD
+
+# Environment files
 .env
 .env.*
 !.env.example
-.DS_Store
+
+# Secret files
+secret/
+
+# Database configuration (may contain credentials)
+config/db.php
+config/db.local.php
+
+# Editor settings
 .vscode/
 .idea/
-config/db.local.php
-config/db.php
-=======
-*.log
-.DS_Store
 
-.env
-secret/
-config/
->>>>>>> 6b8792f2f8d3b414c8e32e7a1d95e37703a37afc
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log

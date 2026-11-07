@@ -1,7 +1,9 @@
 <?php
-require 'auth.php'; 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+require 'auth.php';
 require 'config/db.php';
-$error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_auth_token();
@@ -9,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = strtolower(trim((string)($_POST['email'] ?? '')));
     $password = (string)($_POST['password'] ?? '');
     $confirm_password = (string)($_POST['confirm_password'] ?? '');
-
+}
     if ($full_name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 6) {
         $error = 'กรุณากรอกข้อมูลให้ครบถ้วน (รหัสผ่านอย่างน้อย 6 ตัวอักษร)';
     } elseif ($password !== $confirm_password) {
@@ -23,19 +25,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if ($stmt->num_rows > 0) {
             $error = 'อีเมลนี้ถูกใช้งาน, กรุณาใช้อีเมลอื่น';
-        } else {
+                } else {
+            $stmt->close();
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            $insert = $conn->prepare("INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)");
-            $insert->bind_param("sss", $full_name, $email, $password_hash);
-            if ($insert->execute()) {
+
+            mysqli_begin_transaction($conn);
+            try {
+                // 1) สร้าง profile ว่างให้ผู้ใช้ใหม่
+                $ps = $conn->prepare("INSERT INTO profile (full_name, headline, email, phone, address, about_me, photo) VALUES (?, '', ?, '', '', '', 'student.jpg')");
+                $ps->bind_param("ss", $full_name, $email);
+                $ps->execute();
+                $new_profile_id = $conn->insert_id;
+                $ps->close();
+
+                // 2) สร้าง user ผูกกับ profile นั้น
+                $insert = $conn->prepare("INSERT INTO users (profile_id, full_name, email, password_hash) VALUES (?, ?, ?, ?)");
+                $insert->bind_param("isss", $new_profile_id, $full_name, $email, $password_hash);
+                $insert->execute();
+                $insert->close();
+
+                mysqli_commit($conn);
                 header("Location: login.php?registered=1");
                 exit();
-            } else {
-                $error = 'เกิดข้อผิดพลาดในการสมัครสมาชิก';
+            } catch (Throwable $e) {
+                mysqli_rollback($conn);
+                $error = 'สมัครสมาชิกไม่สำเร็จ: ' . $e->getMessage();
             }
         }
     }
-}
 ?>
 <!doctype html>
 <html lang="th">
