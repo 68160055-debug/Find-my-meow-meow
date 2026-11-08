@@ -1,0 +1,5 @@
+# กำหนดให้ไฟล์ PHP ไม่ถูกมองว่าเป็นภาษา Hack
+*.php linguist-detectable=true
+
+# หรือหากมีไฟล์เฉพาะโฟลเดอร์ที่ต้องการซ่อนไม่ให้คิดสถิติ
+# assets/ linguist-vendored

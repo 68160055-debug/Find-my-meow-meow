@@ -8,9 +8,9 @@ require_login();
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>หน้าหลัก - Find-my-meow-meow</title>
-
-    
+    <title>หน้าหลัก - MyCommunity</title>
+    <link rel="stylesheet" href="assets/css/community.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -28,7 +28,7 @@ require_login();
                 <div class="notice-icon">📢</div>
                 <div class="notice-text">
                     <span class="badge-admin">ประกาศจาก Admin</span>
-                    <h3>ยินดีต้อนรับสู่ Find-my-meow-meow ค่ะ🎉</h3>
+                    <h3>ยินดีต้อนรับสู่ Find-my-meow-meow เว็บเพจประกาศหาแมวและหาบ้านให้แมว 🎉</h3>
                     <p>ขอให้ทุกคนใช้งานอย่างมีความสุข และอยู่ร่วมกันอย่างมีน้ำใจนะคะ 💙</p>
                 </div>
             </div>
