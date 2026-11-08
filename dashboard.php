@@ -9,8 +9,7 @@ require_login();
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>หน้าหลัก - MyCommunity</title>
-    <link rel="stylesheet" href="assets/css/community.css">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
 </head>
 <body>
 
