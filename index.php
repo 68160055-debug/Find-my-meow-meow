@@ -1,4 +1,3 @@
-
 <?php
 require 'auth.php';
 require 'config/db.php';
@@ -8,7 +7,7 @@ $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
 
-// จัดการเมื่อมีการส่งฟอร์มแก้ไขชื่อหรือรูปภาพ
+// จัดการเมื่อมีการส่งฟอร์ม (PHP อยู่ด้านบนสุดทั้งหมด ป้องกันปัญหาข้อมูลเป็น NULL)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_auth_token();
 
@@ -30,6 +29,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // 2. แก้ไขเพศ (Gender)
+    if (isset($_POST['update_gender'])) {
+        $gender = trim((string)($_POST['gender'] ?? ''));
+        $allowed_genders = ['female', 'male', 'other'];
+        if (in_array($gender, $allowed_genders)) {
+            $stmt = $conn->prepare("UPDATE users SET gender = ? WHERE id = ?");
+            $stmt->bind_param("si", $gender, $user_id);
+            if ($stmt->execute()) {
+                $message = 'อัปเดตเพศเรียบร้อยแล้ว!';
+            } else {
+                $error = 'เกิดข้อผิดพลาดในการอัปเดตเพศ';
+            }
+            $stmt->close();
+        } else {
+            $error = 'กรุณาเลือกเพศที่ถูกต้อง';
+        }
+    }
+
+    // 3. แก้ไขสถานะ/อาชีพ (Status)
+    if (isset($_POST['update_status'])) {
+        $status = trim((string)($_POST['status'] ?? ''));
+        $status_other = trim((string)($_POST['status_other'] ?? ''));
+        
+        if ($status === 'other' && $status_other !== '') {
+            $final_status = 'อื่นๆ: ' . $status_other;
+        } else {
+            $final_status = $status;
+        }
+
+        $stmt = $conn->prepare("UPDATE users SET status = ? WHERE id = ?");
+        $stmt->bind_param("si", $final_status, $user_id);
+        if ($stmt->execute()) {
+            $message = 'อัปเดตสถานะ/อาชีพเรียบร้อยแล้ว!';
+        } else {
+            $error = 'เกิดข้อผิดพลาดในการอัปเดตสถานะ';
+        }
+        $stmt->close();
+    }
+
     // 4. อัปเดตรูปภาพโปรไฟล์
     if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
         $file_tmp = $_FILES['avatar']['tmp_name'];
@@ -37,7 +75,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $file_name = time() . '_' . preg_replace("/[^a-zA-Z0-9\._-]/", "", $original_name);
         $upload_dir = __DIR__ . '/assets/images/';
         
-        // สร้างโฟลเดอร์อัตโนมัติหากยังไม่มี
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0755, true);
         }
@@ -52,11 +89,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute();
                 $stmt->close();
                 
-                // รีเฟรชหน้าเพื่อแสดงรูปใหม่ทันที
-                header("Location: profile.php?success=avatar");
+                header("Location: index.php?success=avatar");
                 exit();
             } else {
-                $error = 'ไม่สามารถบันทึกไฟล์รูปภาพได้ (ตรวจสอบสิทธิ์โฟลเดอร์ assets/images)';
+                $error = 'ไม่สามารถบันทึกไฟล์รูปภาพได้';
             }
         } else {
             $error = 'อนุญาตเฉพาะไฟล์รูปภาพ (jpg, jpeg, png, gif, webp) เท่านั้น';
@@ -64,8 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ดึงข้อมูลผู้ใช้ปัจจุบัน
-$stmt = $conn->prepare("SELECT full_name, email, avatar FROM users WHERE id = ? LIMIT 1");
+// ดึงข้อมูลผู้ใช้ปัจจุบันล่าสุดรวมถึง gender และ status
+$stmt = $conn->prepare("SELECT full_name, email, avatar, gender, status FROM users WHERE id = ? LIMIT 1");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $user = $stmt->get_result()->fetch_assoc();
@@ -145,12 +181,14 @@ $stmt->close();
             display: flex;
             gap: 8px;
         }
-        .input-flex input[type="text"] {
+        .input-flex input[type="text"], .input-flex select {
             flex: 1;
             padding: 9px 12px;
             border: 1px solid #ced4da;
             border-radius: 8px;
             font-size: 14px;
+            background: white;
+            font-family: 'Kanit', sans-serif;
         }
         .btn-edit {
             background: #ff758c;
@@ -176,8 +214,6 @@ $stmt->close();
         .btn-logout-main:hover {
             background-color: #c82333;
         }
-        
-        /* Modal Popup จัดกึ่งกลางจออย่างสมบูรณ์ */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -260,7 +296,7 @@ $stmt->close();
             <div class="email-display"><?= htmlspecialchars($user['email']) ?></div>
         </div>
 
-        <!-- แก้ไขชื่อ -->
+        <!-- แก้ไขชื่อ-นามสกุล -->
         <div class="info-group">
             <label>ชื่อ-นามสกุล (Name-Surname)</label>
             <form method="post">
@@ -272,47 +308,13 @@ $stmt->close();
             </form>
         </div>
 
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-        <!-- แก้ไขชื่อเล่น -->
-         <label>ชื่อเล่น (Nickname)</label>
-            <form method="post">
-            <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <div class="input-flex">
-                    <input type="text" name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required>
-                    <button type="submit" name="update_name" class="btn-edit">แก้ไขชื่อ</button>
-                </div>
-            </form>
-        </div>
-
-      // แก้ไขเพศ
-    <?php 
-    if (isset($_POST['update_gender'])) {
-        $gender = trim((string)($_POST['gender'] ?? ''));
-        $allowed_genders = ['female', 'male', 'other'];
-        if (in_array($gender, $allowed_genders)) {
-            $stmt = $conn->prepare("UPDATE users SET gender = ? WHERE id = ?");
-            $stmt->bind_param("si", $gender, $user_id);
-            if ($stmt->execute()) {
-                $message = 'อัปเดตเพศเรียบร้อยแล้ว!';
-            } else {
-                $error = 'เกิดข้อผิดพลาดในการอัปเดตเพศ';
-            }
-            $stmt->close();
-        } else {
-            $error = 'กรุณาเลือกเพศที่ถูกต้อง';
-        }
-    }
- // ดึงข้อมูลผู้ใช้ปัจจุบัน
-    $stmt = $conn->prepare("SELECT full_name, email, avatar, gender FROM users WHERE id = ? LIMIT 1");
-
-        <!-- แก้ไขเพศ -->
+        <!-- แก้ไขเพศ (Gender) -->
         <div class="info-group">
-            <label>เพศ (Gender)</label>
+            <label>♀️ เพศ (Gender)</label>
             <form method="post">
                 <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
                 <div class="input-flex">
-                    <select name="gender" style="flex: 1; padding: 9px 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 14px; background: white; font-family: 'Kanit', sans-serif;">
+                    <select name="gender">
                         <option value="female" <?= (isset($user['gender']) && $user['gender'] === 'female') ? 'selected' : '' ?>>หญิง (Female)</option>
                         <option value="male" <?= (isset($user['gender']) && $user['gender'] === 'male') ? 'selected' : '' ?>>ชาย (Male)</option>
                         <option value="other" <?= (isset($user['gender']) && $user['gender'] === 'other') ? 'selected' : '' ?>>อื่นๆ / ไม่ระบุ</option>
@@ -321,26 +323,33 @@ $stmt->close();
                 </div>
             </form>
         </div>
-?>
 
-
-        <!-- แก้ไขอายุ -->
+        <!-- แก้ไขสถานะ/อาชีพ (Status) -->
         <div class="info-group">
-            <label>อายุ</lable>
-            <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <div class="input-flex">
-                    <input type="text" name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required>
-                    <button type="submit" name="update_name" class="btn-edit">แก้ไขอายุ</button>
+            <label>💼 สถานะ/อาชีพ (Status)</label>
+            <form method="post">
+                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
+                <div class="input-flex" style="flex-direction: column; gap: 6px;">
+                    <div style="display: flex; gap: 8px;">
+                        <select name="status" id="statusSelect" onchange="toggleOtherStatus(this.value)" style="flex: 1;">
+                            <option value="ข้าราชการ/พนักงานบริษัท" <?= (isset($user['status']) && $user['status'] === 'ข้าราชการ/พนักงานบริษัท') ? 'selected' : '' ?>>ข้าราชการ/พนักงานบริษัท</option>
+                            <option value="นักเรียน/นักศึกษา" <?= (isset($user['status']) && $user['status'] === 'นักเรียน/นักศึกษา') ? 'selected' : '' ?>>นักเรียน/นักศึกษา</option>
+                            <option value="เจ้าของธุรกิจ/ผู้ประกอบการ" <?= (isset($user['status']) && $user['status'] === 'เจ้าของธุรกิจ/ผู้ประกอบการ') ? 'selected' : '' ?>>เจ้าของธุรกิจ/ผู้ประกอบการ</option>
+                            <option value="ว่างงาน/อยู่ระหว่างหางาน" <?= (isset($user['status']) && $user['status'] === 'ว่างงาน/อยู่ระหว่างหางาน') ? 'selected' : '' ?>>ว่างงาน/อยู่ระหว่างหางาน</option>
+                            <option value="other" <?= (isset($user['status']) && str_starts_with($user['status'], 'อื่นๆ')) ? 'selected' : '' ?>>อื่นๆ</option>
+                        </select>
+                        <button type="submit" name="update_status" class="btn-edit">บันทึก</button>
+                    </div>
+                    <input type="text" name="status_other" id="statusOtherInput" placeholder="กรุณาระบุ..." 
+                           value="<?= (isset($user['status']) && str_starts_with($user['status'], 'อื่นๆ')) ? htmlspecialchars(substr($user['status'], 6)) : '' ?>"
+                           style="display: <?= (isset($user['status']) && str_starts_with($user['status'], 'อื่นๆ')) ? 'block' : 'none' ?>; width: 100%;">
                 </div>
-               </form>
-            </div>
+            </form>
+        </div>
 
-        <!-- แก้ไขสถานะ/อาชีพ -->
-        <div class="info-group">
-            <label>สถานะ/อาชีพ</lable>
-            
-            
-        <!-- ปุ่มออกจากระบบ (สีแดงอยู่ล่างสุด) -->
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <!-- ปุ่มออกจากระบบ -->
         <button type="button" class="btn-logout-main" onclick="showLogoutModal()">ออกจากระบบ</button>
     </div>
 </main>
@@ -366,6 +375,17 @@ $stmt->close();
     }
     function hideLogoutModal() {
         document.getElementById('logoutModal').style.display = 'none';
+    }
+    function toggleOtherStatus(val) {
+        const otherInput = document.getElementById('statusOtherInput');
+        if (val === 'other') {
+            otherInput.style.display = 'block';
+            otherInput.required = true;
+        } else {
+            otherInput.style.display = 'none';
+            otherInput.required = false;
+            otherInput.value = '';
+        }
     }
 </script>
 
