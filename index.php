@@ -1,10 +1,9 @@
-
 <?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-header("Location: Index.php");  // เปลี่ยนจาก index.php เป็น Index.php
-require_once 'auth.php';  // เดิมเป็น auth.php
+
+require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
@@ -40,242 +39,43 @@ $month_names_th = [
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; background: #fff0f3; font-family: 'Kanit', sans-serif; color: #444; }
-        
-        .dashboard-layout {
-            display: grid;
-            grid-template-columns: 260px 1fr 310px;
-            min-height: 100vh;
-        }
-
-        /* 1. Left Sidebar */
-        .dash-sidebar {
-            background: #ffffff;
-            border-right: 1px solid #ffccd5;
-            padding: 25px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-        }
-        .dash-brand {
-            font-weight: bold;
-            font-size: 20px;
-            color: #d81b60;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .dash-nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            border-radius: 14px;
-            text-decoration: none;
-            color: #555;
-            font-weight: 500;
-            font-size: 15px;
-            transition: all 0.2s;
-        }
-        .dash-nav-item.active, .dash-nav-item:hover {
-            background: #ff758c;
-            color: white;
-            box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3);
-        }
-
-        /* 2. Main Content Center */
-        .dash-main {
-            padding: 25px 30px;
-            overflow-y: auto;
-        }
-        .top-dash-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 25px;
-            background: white;
-            padding: 14px 25px;
-            border-radius: 20px;
-            border: 1px solid #ffccd5;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
-        }
-        .dash-search {
-            position: relative;
-        }
-        .dash-search input {
-            padding: 10px 15px 10px 40px;
-            border-radius: 20px;
-            border: 1px solid #ffccd5;
-            width: 320px;
-            background: #fff8f9;
-            font-family: 'Kanit', sans-serif;
-            outline: none;
-        }
-        .notice-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-        .notice-card {
-            background: white;
-            border-radius: 16px;
-            padding: 16px;
-            border: 1px solid #ffccd5;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-        }
-
-        /* Post Box & Feed Cards */
-        .post-box {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            border: 1px solid #ffccd5;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        }
-        .post-input-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
-        .post-input-row input {
-            flex: 1;
-            padding: 12px 20px;
-            border-radius: 25px;
-            border: 1px solid #ffccd5;
-            background: #fff8f9;
-            font-family: 'Kanit', sans-serif;
-            outline: none;
-        }
-        .btn-post {
-            background: #d81b60;
-            color: white;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 20px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Kanit', sans-serif;
-            transition: background 0.2s;
-        }
+        .dashboard-layout { display: grid; grid-template-columns: 260px 1fr 310px; min-height: 100vh; }
+        .dash-sidebar { background: #ffffff; border-right: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; height: 100vh; }
+        .dash-brand { font-weight: bold; font-size: 20px; color: #d81b60; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .dash-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; text-decoration: none; color: #555; font-weight: 500; font-size: 15px; transition: all 0.2s; }
+        .dash-nav-item.active, .dash-nav-item:hover { background: #ff758c; color: white; box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3); }
+        .dash-main { padding: 25px 30px; overflow-y: auto; }
+        .top-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; background: white; padding: 14px 25px; border-radius: 20px; border: 1px solid #ffccd5; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
+        .dash-search { position: relative; }
+        .dash-search input { padding: 10px 15px 10px 40px; border-radius: 20px; border: 1px solid #ffccd5; width: 320px; background: #fff8f9; font-family: 'Kanit', sans-serif; outline: none; }
+        .post-box { background: white; border-radius: 20px; padding: 20px; border: 1px solid #ffccd5; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+        .post-input-row { display: flex; gap: 12px; align-items: center; }
+        .post-input-row input { flex: 1; padding: 12px 20px; border-radius: 25px; border: 1px solid #ffccd5; background: #fff8f9; font-family: 'Kanit', sans-serif; outline: none; }
+        .btn-post { background: #d81b60; color: white; border: none; padding: 10px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; transition: background 0.2s; }
         .btn-post:hover { background: #ad1457; }
-
-        .feed-card {
-            background: white;
-            border-radius: 20px;
-            padding: 22px;
-            border: 1px solid #ffccd5;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        }
-        .feed-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        .feed-user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .feed-user-info img {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 2px solid #ffb6c1;
-        }
-        .btn-follow {
-            background: #fff0f3;
-            color: #d81b60;
-            border: 1px solid #ffccd5;
-            padding: 6px 14px;
-            border-radius: 15px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-        }
+        .feed-card { background: white; border-radius: 20px; padding: 22px; border: 1px solid #ffccd5; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+        .feed-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .feed-user-info { display: flex; align-items: center; gap: 12px; }
+        .feed-user-info img { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid #ffb6c1; }
+        .btn-follow { background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5; padding: 6px 14px; border-radius: 15px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .btn-follow:hover { background: #ff758c; color: white; }
-        .post-actions {
-            display: flex;
-            gap: 20px;
-            margin-top: 15px;
-            padding-top: 12px;
-            border-top: 1px solid #fff0f3;
-        }
-        .act-btn {
-            background: none;
-            border: none;
-            color: #666;
-            cursor: pointer;
-            font-family: 'Kanit', sans-serif;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+        .post-actions { display: flex; gap: 20px; margin-top: 15px; padding-top: 12px; border-top: 1px solid #fff0f3; }
+        .act-btn { background: none; border: none; color: #666; cursor: pointer; font-family: 'Kanit', sans-serif; font-size: 14px; display: flex; align-items: center; gap: 6px; }
         .act-btn:hover { color: #d81b60; }
-
-        /* 3. Right Sidebar */
-        .dash-right {
-            background: #ffffff;
-            border-left: 1px solid #ffccd5;
-            padding: 25px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-        }
-        .widget-box {
-            background: #fff8f9;
-            border-radius: 18px;
-            padding: 18px;
-            border: 1px solid #ffccd5;
-            text-align: center;
-        }
-        .calendar-table {
-            width: 100%;
-            font-size: 13px;
-            border-collapse: collapse;
-            text-align: center;
-            margin-top: 10px;
-        }
+        .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
+        .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
+        .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
         .calendar-table td, .calendar-table th { padding: 6px 2px; }
-        .cal-today {
-            background: #d81b60;
-            color: white;
-            border-radius: 50%;
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            line-height: 24px;
-            font-weight: 600;
-        }
+        .cal-today { background: #d81b60; color: white; border-radius: 50%; display: inline-block; width: 24px; height: 24px; line-height: 24px; font-weight: 600; }
         .cal-past { color: #333; cursor: pointer; }
         .cal-future { color: #ccc; cursor: not-allowed; }
         .world-time-list { list-style: none; padding: 0; margin: 0; text-align: left; font-size: 13px; }
-        .world-time-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px dashed #ffccd5;
-        }
+        .world-time-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ffccd5; }
     </style>
 </head>
 <body>
 
 <div class="dashboard-layout">
-    <!-- แถบซ้ายมือ (Sidebar) -->
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
         <a href="index.php" class="dash-nav-item active">🏠 หน้าแรก</a>
@@ -290,7 +90,6 @@ $month_names_th = [
         </div>
     </aside>
 
-    <!-- พื้นที่ตรงกลาง (Main Content) -->
     <main class="dash-main">
         <header class="top-dash-header">
             <div class="dash-search">
@@ -307,7 +106,6 @@ $month_names_th = [
             </div>
         </header>
 
-        <!-- โพสต์สาธารณะ -->
         <div class="post-box">
             <div class="post-input-row">
                 <img src="assets/images/<?= htmlspecialchars($avatar_img) ?>" onerror="this.src='assets/images/student.jpg';" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover;">
@@ -316,7 +114,6 @@ $month_names_th = [
             </div>
         </div>
 
-        <!-- รายการโพสต์ตัวอย่าง -->
         <div class="feed-card">
             <div class="feed-header">
                 <div class="feed-user-info">
@@ -340,9 +137,7 @@ $month_names_th = [
         </div>
     </main>
 
-    <!-- แถบขวามือ (Right Sidebar) -->
     <aside class="dash-right">
-        <!-- การ์ดโปรไฟล์ย่อ -->
         <div class="widget-box">
             <img src="assets/images/<?= htmlspecialchars($avatar_img) ?>" onerror="this.src='assets/images/student.jpg';" style="width: 75px; height: 75px; border-radius: 50%; object-fit: cover; border: 3px solid #ff758c; margin-bottom: 8px;">
             <h3 style="font-size: 16px; color: #333; margin: 0 0 4px 0;"><?= htmlspecialchars($current_user['full_name']) ?></h3>
@@ -350,7 +145,6 @@ $month_names_th = [
             <a href="profile.php" style="display: inline-block; background: #ffccd5; color: #d81b60; padding: 6px 18px; border-radius: 14px; text-decoration: none; font-size: 13px; font-weight: 600;">ดูโปรไฟล์</a>
         </div>
 
-        <!-- ปฏิทิน -->
         <div class="widget-box">
             <?php
                 $prev_month = $month - 1; $prev_year = $year;
@@ -367,27 +161,16 @@ $month_names_th = [
                 <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
                 <tr>
                 <?php
-                $current_day = 1;
-                $today_d = (int)date('j');
-                $today_m = (int)date('n');
-                $today_y = (int)date('Y');
-
+                $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
                 for ($i = 0; $i < 42; $i++) {
                     if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
                         $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
                         $is_future = ($year > $today_y) || ($year == $today_y && $month > $today_m) || ($year == $today_y && $month == $today_m && $current_day > $today_d);
-
-                        if ($is_today) {
-                            echo "<td><span class='cal-today'>{$current_day}</span></td>";
-                        } elseif ($is_future) {
-                            echo "<td><span class='cal-future'>{$current_day}</span></td>";
-                        } else {
-                            echo "<td><span class='cal-past'>{$current_day}</span></td>";
-                        }
+                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
+                        elseif ($is_future) echo "<td><span class='cal-future'>{$current_day}</span></td>";
+                        else echo "<td><span class='cal-past'>{$current_day}</span></td>";
                         $current_day++;
-                    } else {
-                        echo "<td></td>";
-                    }
+                    } else { echo "<td></td>"; }
                     if ($i % 7 == 6) echo "</tr><tr>";
                 }
                 ?>
@@ -395,7 +178,6 @@ $month_names_th = [
             </table>
         </div>
 
-        <!-- เวลาปัจจุบันตามประเทศ -->
         <div class="widget-box" style="text-align: left;">
             <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
             <ul class="world-time-list">
@@ -416,9 +198,7 @@ $month_names_th = [
         document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
         document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
     }
-    setInterval(updateWorldTimes, 1000);
-    updateWorldTimes();
+    setInterval(updateWorldTimes, 1000); updateWorldTimes();
 </script>
-
 </body>
 </html>

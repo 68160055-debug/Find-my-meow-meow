@@ -2,7 +2,7 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-require_once 'auth.php';  // เดิมเป็น auth.php
+require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
@@ -99,271 +99,49 @@ $month_names_th = [
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; background: #fff0f3; font-family: 'Kanit', sans-serif; color: #444; }
-        
-        .dashboard-layout {
-            display: grid;
-            grid-template-columns: 260px 1fr 310px;
-            min-height: 100vh;
-        }
-
-        /* Left Sidebar */
-        .dash-sidebar {
-            background: #ffffff;
-            border-right: 1px solid #ffccd5;
-            padding: 25px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-        }
-        .dash-brand {
-            font-weight: bold;
-            font-size: 20px;
-            color: #d81b60;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .dash-nav-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            border-radius: 14px;
-            text-decoration: none;
-            color: #555;
-            font-weight: 500;
-            font-size: 15px;
-            transition: all 0.2s;
-        }
-        .dash-nav-item.active, .dash-nav-item:hover {
-            background: #ff758c;
-            color: white;
-            box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3);
-        }
-
-        /* Main Content Center */
-        .dash-main {
-            padding: 25px 30px;
-            overflow-y: auto;
-        }
-        .profile-card {
-            background: #ffffff;
-            border-radius: 20px;
-            padding: 30px;
-            border: 1px solid #ffccd5;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.02);
-        }
-        .profile-header-flex {
-            display: flex;
-            align-items: center;
-            gap: 25px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-        }
-        .avatar-box {
-            position: relative;
-            cursor: pointer;
-        }
-        .profile-avatar-img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid #ffb6c1;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        .stats-badges {
-            display: flex;
-            gap: 15px;
-        }
-        .stat-card {
-            background: #fff0f3;
-            padding: 12px 20px;
-            border-radius: 14px;
-            text-align: center;
-            border: 1px solid #ffccd5;
-            min-width: 100px;
-        }
-        .stat-card strong {
-            display: block;
-            font-size: 18px;
-            color: #d81b60;
-        }
-        .stat-card span {
-            font-size: 12px;
-            color: #666;
-        }
-        .email-pill {
-            background: #fff0f3;
-            color: #d81b60;
-            padding: 10px 16px;
-            border-radius: 16px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            border: 1px solid #ffccd5;
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group.full {
-            grid-column: span 2;
-        }
-        .form-group label {
-            display: block;
-            font-weight: 600;
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 6px;
-        }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 11px 14px;
-            border: 1px solid #ffccd5;
-            border-radius: 12px;
-            font-size: 14px;
-            background: #fff8f9;
-            font-family: 'Kanit', sans-serif;
-            outline: none;
-        }
+        .dashboard-layout { display: grid; grid-template-columns: 260px 1fr 310px; min-height: 100vh; }
+        .dash-sidebar { background: #ffffff; border-right: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; height: 100vh; }
+        .dash-brand { font-weight: bold; font-size: 20px; color: #d81b60; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+        .dash-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; text-decoration: none; color: #555; font-weight: 500; font-size: 15px; transition: all 0.2s; }
+        .dash-nav-item.active, .dash-nav-item:hover { background: #ff758c; color: white; box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3); }
+        .dash-main { padding: 25px 30px; overflow-y: auto; }
+        .profile-card { background: #ffffff; border-radius: 20px; padding: 30px; border: 1px solid #ffccd5; box-shadow: 0 4px 15px rgba(0,0,0,0.02); }
+        .profile-header-flex { display: flex; align-items: center; gap: 25px; margin-bottom: 25px; flex-wrap: wrap; }
+        .avatar-box { position: relative; cursor: pointer; }
+        .profile-avatar-img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #ffb6c1; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .stats-badges { display: flex; gap: 15px; }
+        .stat-card { background: #fff0f3; padding: 12px 20px; border-radius: 14px; text-align: center; border: 1px solid #ffccd5; min-width: 100px; }
+        .stat-card strong { display: block; font-size: 18px; color: #d81b60; }
+        .stat-card span { font-size: 12px; color: #666; }
+        .email-pill { background: #fff0f3; color: #d81b60; padding: 10px 16px; border-radius: 16px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; border: 1px solid #ffccd5; width: 100%; margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group.full { grid-column: span 2; }
+        .form-group label { display: block; font-weight: 600; font-size: 14px; color: #555; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 11px 14px; border: 1px solid #ffccd5; border-radius: 12px; font-size: 14px; background: #fff8f9; font-family: 'Kanit', sans-serif; outline: none; }
         .form-group textarea { resize: vertical; height: 90px; }
-        .btn-save-profile {
-            background: #d81b60;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 15px;
-            font-family: 'Kanit', sans-serif;
-            transition: background 0.2s;
-        }
+        .btn-save-profile { background: #d81b60; color: white; border: none; padding: 12px 25px; border-radius: 14px; font-weight: 600; cursor: pointer; font-size: 15px; font-family: 'Kanit', sans-serif; transition: background 0.2s; }
         .btn-save-profile:hover { background: #ad1457; }
-        .btn-logout-trigger {
-            background: #ff758c;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 14px;
-            width: 100%;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 20px;
-            font-family: 'Kanit', sans-serif;
-        }
-
-        /* Modal ยืนยันการออกจากระบบ */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            z-index: 9999;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-box {
-            background: white;
-            border-radius: 20px;
-            padding: 30px;
-            width: 90%;
-            max-width: 380px;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-        }
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin-top: 20px;
-        }
-        .btn-yes {
-            background: #ff758c;
-            color: white;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Kanit', sans-serif;
-        }
-        .btn-cancel {
-            background: #fff;
-            color: #d81b60;
-            border: 1px solid #ff758c;
-            padding: 10px 24px;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Kanit', sans-serif;
-        }
-
-        /* Right Sidebar */
-        .dash-right {
-            background: #ffffff;
-            border-left: 1px solid #ffccd5;
-            padding: 25px 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            position: sticky;
-            top: 0;
-            height: 100vh;
-        }
-        .widget-box {
-            background: #fff8f9;
-            border-radius: 18px;
-            padding: 18px;
-            border: 1px solid #ffccd5;
-            text-align: center;
-        }
-        .calendar-table {
-            width: 100%;
-            font-size: 13px;
-            border-collapse: collapse;
-            text-align: center;
-            margin-top: 10px;
-        }
+        .btn-logout-trigger { background: #ff758c; color: white; border: none; padding: 12px; border-radius: 14px; width: 100%; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 20px; font-family: 'Kanit', sans-serif; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); z-index: 9999; justify-content: center; align-items: center; }
+        .modal-box { background: white; border-radius: 20px; padding: 30px; width: 90%; max-width: 380px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .modal-actions { display: flex; gap: 12px; justify-content: center; margin-top: 20px; }
+        .btn-yes { background: #ff758c; color: white; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; }
+        .btn-cancel { background: #fff; color: #d81b60; border: 1px solid #ff758c; padding: 10px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; }
+        .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
+        .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
+        .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
         .calendar-table td, .calendar-table th { padding: 6px 2px; }
-        .cal-today {
-            background: #d81b60;
-            color: white;
-            border-radius: 50%;
-            display: inline-block;
-            width: 24px;
-            height: 24px;
-            line-height: 24px;
-            font-weight: 600;
-        }
+        .cal-today { background: #d81b60; color: white; border-radius: 50%; display: inline-block; width: 24px; height: 24px; line-height: 24px; font-weight: 600; }
         .cal-past { color: #333; cursor: pointer; }
         .cal-future { color: #ccc; cursor: not-allowed; }
         .world-time-list { list-style: none; padding: 0; margin: 0; text-align: left; font-size: 13px; }
-        .world-time-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px dashed #ffccd5;
-        }
+        .world-time-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ffccd5; }
     </style>
 </head>
 <body>
 
 <div class="dashboard-layout">
-    <!-- แถบซ้ายมือ (Sidebar) -->
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
         <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
@@ -378,7 +156,6 @@ $month_names_th = [
         </div>
     </aside>
 
-    <!-- พื้นที่ตรงกลาง (Main Content) -->
     <main class="dash-main">
         <div class="profile-card">
             <h2 style="color: #d81b60; margin-top: 0; margin-bottom: 20px;">🐾 โปรไฟล์ของผู้ฉัน / My Profile</h2>
@@ -391,7 +168,6 @@ $month_names_th = [
                 <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
                 
                 <div class="profile-header-flex">
-                    <!-- คลิกอัปโหลดรูปภาพ (เฉพาะ .jpg / .jpeg) -->
                     <div class="avatar-box" title="คลิกเพื่อเปลี่ยนรูปภาพ (.jpg เท่านั้น)" onclick="document.getElementById('avatarInput').click();">
                         <?php 
                             $avatar_file = !empty($current_user['avatar']) ? $current_user['avatar'] : 'student.jpg';
@@ -413,26 +189,22 @@ $month_names_th = [
                     </div>
                 </div>
 
-                <!-- อีเมล (ล็อกไว้ แก้ไขไม่ได้) -->
                 <div class="email-pill">
                     <span>📧</span>
                     <span><?= htmlspecialchars($current_user['email']) ?> <small>(อีเมลถูกล็อก ไม่สามารถแก้ไขได้)</small></span>
                 </div>
 
                 <div class="form-grid">
-                    <!-- ชื่อ-นามสกุล -->
                     <div class="form-group">
                         <label>👤 ชื่อ-นามสกุล</label>
                         <input type="text" name="full_name" value="<?= htmlspecialchars($current_user['full_name']) ?>" required>
                     </div>
 
-                    <!-- ชื่อเล่น -->
                     <div class="form-group">
                         <label>🐱 ชื่อเล่น</label>
                         <input type="text" name="nickname" value="<?= htmlspecialchars($current_user['nickname'] ?? '') ?>" placeholder="ระบุชื่อเล่น...">
                     </div>
 
-                    <!-- เพศ -->
                     <div class="form-group">
                         <label>⚧ เพศ (Gender)</label>
                         <select name="gender">
@@ -442,7 +214,6 @@ $month_names_th = [
                         </select>
                     </div>
 
-                    <!-- สถานะ/อาชีพ -->
                     <div class="form-group">
                         <label>💼 สถานะ/อาชีพ (Status)</label>
                         <select name="status">
@@ -454,13 +225,11 @@ $month_names_th = [
                         </select>
                     </div>
 
-                    <!-- เบอร์โทรศัพท์ -->
                     <div class="form-group full">
                         <label>📞 เบอร์โทรศัพท์</label>
                         <input type="text" name="phone" value="<?= htmlspecialchars($current_user['phone'] ?? '') ?>" placeholder="089-123-4567">
                     </div>
 
-                    <!-- คำอธิบายโปรไฟล์ -->
                     <div class="form-group full">
                         <label>✏️ คำอธิบายโปรไฟล์</label>
                         <textarea name="bio" placeholder="กรุณาใส่คำอธิบายเกี่ยวกับตัวคุณ..." maxlength="500"><?= htmlspecialchars($current_user['bio'] ?? '') ?></textarea>
@@ -476,9 +245,7 @@ $month_names_th = [
         </div>
     </main>
 
-    <!-- แถบขวามือ (Right Sidebar) -->
     <aside class="dash-right">
-        <!-- ปฏิทิน -->
         <div class="widget-box">
             <?php
                 $prev_month = $month - 1; $prev_year = $year;
@@ -523,7 +290,6 @@ $month_names_th = [
             </table>
         </div>
 
-        <!-- เวลาปัจจุบันตามประเทศ -->
         <div class="widget-box" style="text-align: left;">
             <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
             <ul class="world-time-list">
@@ -536,7 +302,6 @@ $month_names_th = [
     </aside>
 </div>
 
-<!-- Modal ยืนยันออกจากระบบ -->
 <div id="logoutModal" class="modal-overlay">
     <div class="modal-box">
         <h3 style="color: #d81b60; margin-bottom: 10px;">คุณแน่ใจหรือไม่อ่ะ?</h3>
