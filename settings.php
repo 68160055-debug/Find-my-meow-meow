@@ -1,5 +1,5 @@
 <?php
-require_once 'auth.php';
+require_once 'Auth.php';  // เดิมเป็น auth.php
 require_login();
 
 if (isset($_POST['lang'])) {

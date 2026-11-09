@@ -3,7 +3,8 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-
+header("Location: Adopter.php?r=" . $result);  // เปลี่ยนเป็นตัว A ใหญ่
+$active = 'Adopter.php';
 $user_id = (int)$_SESSION['user_id'];
 
 function fetch_all_rows($conn, $sql, $types, ...$params) {

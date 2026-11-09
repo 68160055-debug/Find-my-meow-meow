@@ -1,5 +1,5 @@
 <?php
-require 'crud_bootstrap.php';
+require 'Crud_bootstrap.php';
 $pid=profile_id($conn); $rows=[];
 $stmt=mysqli_prepare($conn,'SELECT id,skill_name,skill_level FROM skill WHERE profile_id = ? ORDER BY id DESC');
 mysqli_stmt_bind_param($stmt,'i',$pid); mysqli_stmt_execute($stmt);mysqli_stmt_bind_result($stmt,$id,$name,$level);

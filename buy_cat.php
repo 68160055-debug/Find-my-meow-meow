@@ -1,9 +1,9 @@
 <?php
-require_once 'auth.php';
+require_once 'Auth.php';  // เดิมเป็น auth.php
 require_once 'config/db.php';
 require_login();
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-
+$active = 'Adopter.php';
 $message = '';
 $error = '';
 if (isset($_GET['posted'])) {
