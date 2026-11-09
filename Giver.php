@@ -1,8 +1,8 @@
 <?php
 require_once 'config/db.php';
 
-// ดึงข้อมูลแมวทั้งหมดจากตาราง Giver
-$sql = "SELECT * FROM Giver ORDER BY CreatedDate DESC";
+// ดึงข้อมูลแมวทั้งหมดจากตาราง giver
+$sql = "SELECT * FROM giver ORDER BY createddate DESC";
 $result = $conn->query($sql);
 
 $givers = [];

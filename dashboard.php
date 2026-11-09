@@ -1,7 +1,7 @@
 <?php
-require_once 'Auth.php';  // เดิมเป็น auth.php
+require_once 'auth.php';  // เดิมเป็น auth.php
 require 'config/db.php';
-$active = 'Adopter.php';
+
 require_login();
 ?>
 <!doctype html>

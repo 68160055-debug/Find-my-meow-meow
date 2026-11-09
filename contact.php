@@ -2,10 +2,10 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-require_once 'Auth.php';  // เดิมเป็น auth.php
+require_once 'auth.php';  // เดิมเป็น auth.php
 require_once 'config/db.php';
 require_login();
-$active = 'Adopter.php';
+
 $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';

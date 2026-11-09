@@ -4,7 +4,7 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 header("Location: Index.php");  // เปลี่ยนจาก index.php เป็น Index.php
-require_once 'Auth.php';  // เดิมเป็น auth.php
+require_once 'auth.php';  // เดิมเป็น auth.php
 require_once 'config/db.php';
 require_login();
 

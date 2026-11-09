@@ -5,7 +5,7 @@ error_reporting(E_ALL);
 
 
 <?php
-require 'Crud_bootstrap.php';
+require 'crud_bootstrap.php';
 $id=valid_id($_GET['id']??$_POST['id']??null);$pid=profile_id($conn);$error='';$row=null;
 if(!$id){http_response_code(400);exit('Invalid record ID');}
 
