@@ -1,7 +1,7 @@
 <?php
 require_once 'config/db.php';
 
-// ดึงข้อมูลแมวทั้งหมดจากตาราง Cat
+// ดึงข้อมูลทั้งหมดจากตาราง Cat เรียงลำดับจากใหม่ไปเก่าตาม CreatedDate
 $sql = "SELECT * FROM Cat ORDER BY CreatedDate DESC";
 $result = $conn->query($sql);
 

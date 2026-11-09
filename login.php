@@ -1,107 +1,91 @@
 <?php
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+require_once 'auth.php';
+require_once 'config/db.php';
+require_login();
 
-require 'auth.php';
-require 'config/db.php';
+$user_id = $_SESSION['user_id'];
+$message = ''; $error = '';
 
-if (!empty($_SESSION['user_id'])) {
-    header('Location: index.php'); exit;
-}
-$error = '';
+// จัดการโพสต์ใหม่
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_post'])) {
+    $content = trim($_POST['content'] ?? '');
+    $media_name = ''; $att_name = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    check_auth_token();
-    $email = strtolower(trim((string)($_POST['email'] ?? '')));
-    $password = (string)($_POST['password'] ?? '');
+    if ($content !== '' || !empty($_FILES['media']['name']) || !empty($_FILES['attachment']['name'])) {
+        $upload_dir = 'assets/uploads/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
-        $error = 'กรุณากรอกอีเมลและรหัสผ่านให้ถูกต้อง';
-    } else {
-        $stmt = $conn->prepare("SELECT id, full_name, password_hash, profile_id FROM users WHERE email = ? LIMIT 1");
-        if (!$stmt) {
-            $error = 'DB error: ' . $conn->error;
-        } else {
-            $stmt->bind_param("s", $email);
+        // อัปโหลดรูปภาพ (jpg, png)
+        if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($_FILES['media']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, ['jpg', 'jpeg', 'png'])) {
+                $media_name = time() . '_img_' . basename($_FILES['media']['name']);
+                move_uploaded_file($_FILES['media']['tmp_name'], $upload_dir . $media_name);
+            } else { $error = 'รูปภาพรองรับเฉพาะ .jpg และ .png เท่านั้น'; }
+        }
+
+        // อัปโหลดไฟล์แนบเฉพาะ pdf, doc
+        if (!$error && isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, ['pdf', 'doc', 'docx'])) {
+                $att_name = time() . '_att_' . basename($_FILES['attachment']['name']);
+                move_uploaded_file($_FILES['attachment']['tmp_name'], $upload_dir . $att_name);
+            } else { $error = 'ไฟล์แนบรองรับเฉพาะ .pdf และ .doc/.docx เท่านั้น'; }
+        }
+
+        if (!$error) {
+            $stmt = $conn->prepare("INSERT INTO posts (user_id, content, media_path, attachment_path) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("isss", $user_id, $content, $media_name, $att_name);
             $stmt->execute();
-            $user = $stmt->get_result()->fetch_assoc();
+            $stmt->close();
+            header("Location: index.php");
+            exit;
+        }
+    } else { $error = 'กรุณากรอกข้อความหรือแนบไฟล์อย่างน้อย 1 อย่าง'; }
+}
 
-            if ($user && password_verify($password, $user['password_hash'])) {
-                session_regenerate_id(true);
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['profile_id'] = (int)$user['profile_id'];
-                $_SESSION['full_name'] = $user['full_name'];
-                $_SESSION['email'] = $email;
+// จัดการลบโพสต์
+if (isset($_GET['delete_post'])) {
+    $post_id = (int)$_GET['delete_post'];
+    $stmt = $conn->prepare("DELETE FROM posts WHERE id = ? AND user_id = ?");
+    $stmt->bind_param("ii", $post_id, $user_id);
+    $stmt->execute();
+    $stmt->close();
+    header("Location: index.php");
+    exit;
+}
 
-                header("Location: index.php");
-                exit();
-            } else {
-                $error = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
-            }
+// จัดการไลก์
+if (isset($_GET['like_post'])) {
+    $post_id = (int)$_GET['like_post'];
+    $conn->query("INSERT IGNORE INTO post_likes (post_id, user_id) VALUES ($post_id, $user_id)");
+    
+    // บันทึกแจ้งเตือนเจ้าของโพสต์
+    $owner_res = $conn->query("SELECT user_id FROM posts WHERE id = $post_id");
+    if ($owner_row = $owner_res->fetch_assoc()) {
+        if ($owner_row['user_id'] != $user_id) {
+            $conn->query("INSERT INTO notifications (user_id, message) VALUES ({$owner_row['user_id']}, 'มีผู้ใช้งานกดถูกใจโพสต์ของคุณ')");
         }
     }
+    header("Location: index.php");
+    exit;
 }
+
+// ดึงรายการโพสต์พร้อมระบบค้นหา
+$search = trim($_GET['q'] ?? '');
+if ($search !== '') {
+    $s_param = "%$search%";
+    $stmt = $conn->prepare("SELECT p.*, u.full_name, u.avatar FROM posts p JOIN users u ON p.user_id = u.id WHERE p.content LIKE ? OR u.full_name LIKE ? ORDER BY p.id DESC");
+    $stmt->bind_param("ss", $s_param, $s_param);
+} else {
+    $stmt = $conn->prepare("SELECT p.*, u.full_name, u.avatar FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.id DESC");
+}
+$stmt->execute();
+$posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+// ดึงการแจ้งเตือนของ User
+$notif_res = $conn->query("SELECT * FROM notifications WHERE user_id = $user_id ORDER BY id DESC LIMIT 5");
+$notifications = $notif_res->fetch_all(MYSQLI_ASSOC);
 ?>
-<!doctype html>
-<html lang="th">
-<head>
-    <meta charset="utf-8">
-    <title>เข้าสู่ระบบ - Find my meow meow</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
-</head>
-<body>
-    <header class="navbar">
-        <div class="logo">🐾 Find my meow meow 💖</div>
-        <nav class="nav-links">
-            <a href="index.php">หน้าหลัก</a>
-            <a href="register.php" class="btn-reg">สมัครสมาชิก</a>
-            <a href="login.php" class="btn-login">เข้าสู่ระบบ</a>
-        </nav>
-    </header>
-
-    <div class="login-wrapper">
-        <div class="login-banner">
-            <h2>Adopt · Care · Love 💖</h2>
-            <p>ยินดีต้อนรับกลับมา! เข้าสู่ระบบเพื่อใช้งาน Find my meow meow 💖</p>
-            <img src="assets/images/cat.png" alt="Cat" class="banner-cat-img" onerror="this.src='assets/images/student.jpg';">
-        </div>
-
-        <div class="login-card">
-            <div class="card-header">
-                <span>🐾</span>
-                <h2>เข้าสู่ระบบ</h2>
-            </div>
-            <p class="card-sub">เข้าสู่ระบบเพื่อใช้งาน Find my meow meow 💖</p>
-
-            <?php if(isset($_GET['registered'])): ?><p class="ok" style="color:green; font-size:13px; margin-bottom:10px;">สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ</p><?php endif; ?>
-            <?php if(isset($_GET['logged_out'])): ?><p class="ok" style="color:green; font-size:13px; margin-bottom:10px;">ออกจากระบบเรียบร้อยแล้ว</p><?php endif; ?>
-            <?php if($error): ?><p class="err" style="color:red; font-size:13px; margin-bottom:10px;"><?=auth_escape($error)?></p><?php endif; ?>
-
-            <form method="post">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <label>อีเมล</label>
-                <input type="email" name="email" required autocomplete="username" placeholder="name@example.com">
-                <label>รหัสผ่าน</label>
-                <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
-                
-                <div class="form-actions">
-                    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; cursor:pointer;">
-                        <input type="checkbox" name="remember" style="width:auto; margin:0;"> จำฉันไว้ในระบบ
-                    </label>
-                    <a href="#" class="forgot-link">ลืมรหัสผ่าน?</a>
-                </div>
-
-                <button type="submit" class="btn-submit">เข้าสู่ระบบ</button>
-            </form>
-            
-            <p class="register-prompt">
-                ยังไม่มีบัญชี? <a href="register.php">สมัครสมาชิกที่นี่</a>
-            </p>
-            <div style="text-align: center; margin-top: 15px;">
-                <a href="index.php" style="color: #666; font-size: 13px; text-decoration: none;">← กลับไปหน้าหลัก</a>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
+<!-- HTML Layout ของ index.php (โครงสร้าง 3 คอลัมน์ตามดีไซน์เดิม พร้อมเพิ่มฟอร์มโพสต์และแสดงรายการ) -->
