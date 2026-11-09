@@ -1,7 +1,6 @@
 <?php
-require_once 'auth.php';  // เดิมเป็น auth.php
+require 'auth.php';
 require 'config/db.php';
-
 require_login();
 ?>
 <!doctype html>

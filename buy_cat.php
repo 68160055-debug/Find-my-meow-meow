@@ -1,149 +1,151 @@
 <?php
-require_once 'auth.php';  // เดิมเป็น auth.php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-$message = '';
-$error = '';
-if (isset($_GET['posted'])) {
-    $message = 'โพสต์ประกาศขายแมวเรียบร้อยแล้ว!';
-}
+$user_id = $_SESSION['user_id'];
+$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
+$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+$first_day_of_week = date('w', strtotime("$year-$month-01"));
+$month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
 
-// ---------- โพสต์ขายแมว ----------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['post_cat'])) {
-    check_auth_token();
-
-    $name  = trim((string)($_POST['name'] ?? ''));
-    $price = trim((string)($_POST['price'] ?? ''));
-    $breed = trim((string)($_POST['breed'] ?? ''));
-    $desc  = trim((string)($_POST['description'] ?? ''));
-    $photo = 'cat.png';
-
-    if ($name === '' || $breed === '') {
-        $error = 'กรุณากรอกชื่อแมวและสายพันธุ์';
-    } elseif (!is_numeric($price) || (float)$price < 0) {
-        $error = 'กรุณากรอกราคาเป็นตัวเลข';
-    }
-
-    // อัปโหลดรูป: อนุญาตเฉพาะรูปภาพ (กันการอัปโหลดไฟล์ .php)
-    if ($error === '' && isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-        $ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
-        $is_image = @getimagesize($_FILES['photo']['tmp_name']) !== false;
-
-        if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || !$is_image) {
-            $error = 'อนุญาตเฉพาะไฟล์รูป .jpg .jpeg .png .webp';
-        } elseif ($_FILES['photo']['size'] > 5 * 1024 * 1024) {
-            $error = 'ไฟล์รูปต้องมีขนาดไม่เกิน 5 MB';
-        } else {
-            $upload_dir = __DIR__ . '/assets/images/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0755, true);
-            }
-            $photo = time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-            if (!move_uploaded_file($_FILES['photo']['tmp_name'], $upload_dir . $photo)) {
-                $error = 'ไม่สามารถอัปโหลดรูปได้';
-                $photo = 'cat.png';
-            }
-        }
-    }
-
-    if ($error === '') {
-        try {
-            $price_num = (float)$price;
-            $stmt = $conn->prepare("INSERT INTO Cat (Name, Price, Breed, BehaviorDescription, Photos, Status, CreatedDate) VALUES (?, ?, ?, ?, ?, 'Available', NOW())");
-            $stmt->bind_param("sdsss", $name, $price_num, $breed, $desc, $photo);
-            $stmt->execute();
-            $stmt->close();
-            header("Location: buy_cat.php?posted=1");
-            exit;
-        } catch (mysqli_sql_exception $e) {
-            error_log($e->getMessage());
-            $error = 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่';
-        }
-    }
-}
-
-// ---------- ค้นหา / ดึงรายการแมว ----------
-$q = trim($_GET['q'] ?? '');
-if ($q !== '') {
-    $qp = "%$q%";
-    $stmt = $conn->prepare("SELECT * FROM Cat WHERE Name LIKE ? OR Breed LIKE ? OR BehaviorDescription LIKE ? ORDER BY ID DESC");
-    $stmt->bind_param("sss", $qp, $qp, $qp);
-} else {
-    $stmt = $conn->prepare("SELECT * FROM Cat ORDER BY ID DESC");
-}
-$stmt->execute();
-$cats = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-$page_title = 'ซื้อแมว';
-$active = 'buy_cat.php';
-include 'layout_top.php';
+// รายการแมวตัวอย่าง
+$cat_list = [
+    ['name' => 'Mochi', 'price' => '12,000', 'breed' => 'บริติช ชอร์ตแฮร์', 'img' => 'student.jpg'],
+    ['name' => 'Leo', 'price' => '8,500', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png'],
+    ['name' => 'Luna', 'price' => '8,500', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'student.jpg'],
+    ['name' => 'Lonera', 'price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png'],
+    ['name' => 'Lunnavan', 'price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'student.jpg'],
+    ['name' => 'Lluna', 'price' => '12,000', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'cat.png']
+];
 ?>
+<!doctype html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ซื้อแมว (Buy Cat) - Find my meow meow 💖</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #fff0f3; font-family: 'Kanit', sans-serif; color: #444; }
+        .dashboard-layout { display: grid; grid-template-columns: 260px 1fr 310px; min-height: 100vh; }
+        .dash-sidebar { background: #ffffff; border-right: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; height: 100vh; }
+        .dash-brand { font-weight: bold; font-size: 20px; color: #d81b60; margin-bottom: 15px; }
+        .dash-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; text-decoration: none; color: #555; font-weight: 500; font-size: 15px; transition: all 0.2s; }
+        .dash-nav-item.active, .dash-nav-item:hover { background: #ff758c; color: white; box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3); }
+        .dash-main { padding: 25px 30px; overflow-y: auto; }
+        .catalog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
+        .cat-card { background: white; border-radius: 18px; padding: 15px; border: 1px solid #ffccd5; box-shadow: 0 4px 15px rgba(0,0,0,0.02); text-align: center; }
+        .cat-card img { width: 100%; height: 160px; object-fit: cover; border-radius: 14px; margin-bottom: 10px; }
+        .cat-card h4 { margin: 5px 0; color: #333; font-size: 16px; }
+        .cat-price { color: #d81b60; font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+        .cat-breed { color: #888; font-size: 12px; margin-bottom: 12px; }
+        .btn-buy { background: #ff758c; color: white; border: none; padding: 8px 18px; border-radius: 15px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; text-decoration: none; display: inline-block; font-size: 13px; }
+        .btn-buy:hover { background: #d81b60; }
+        .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
+        .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
+        .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
+        .calendar-table td, .calendar-table th { padding: 6px 2px; }
+        .cal-today { background: #d81b60; color: white; border-radius: 50%; display: inline-block; width: 24px; height: 24px; line-height: 24px; font-weight: 600; }
+        .cal-past { color: #333; cursor: pointer; }
+        .cal-future { color: #ccc; cursor: not-allowed; }
+        .world-time-list { list-style: none; padding: 0; margin: 0; text-align: left; font-size: 13px; }
+        .world-time-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ffccd5; }
+    </style>
+</head>
+<body>
 
-<div class="card">
-    <h2>🛒 ซื้อแมว</h2>
-    <p class="muted">ค้นหาน้องแมวที่ถูกใจ หรือโพสต์ประกาศขายแมวของคุณ</p>
-
-    <?php if ($message): ?><div class="alert-ok"><?= htmlspecialchars($message) ?></div><?php endif; ?>
-    <?php if ($error): ?><div class="alert-err"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-
-    <form method="get" class="search-row">
-        <input type="text" name="q" class="search-input" placeholder="ค้นหาชื่อ สายพันธุ์ หรือนิสัย..." value="<?= htmlspecialchars($q) ?>">
-        <button type="submit" class="btn">🔍 ค้นหา</button>
-        <?php if ($q !== ''): ?><a href="buy_cat.php" class="btn btn-light">ล้าง</a><?php endif; ?>
-    </form>
-</div>
-
-<div class="card">
-    <h3>📝 โพสต์ขายแมว</h3>
-    <form method="post" enctype="multipart/form-data">
-        <?= csrf_input() ?>
-        <div class="form-grid">
-            <div class="form-group">
-                <label>ชื่อแมว *</label>
-                <input type="text" name="name" required maxlength="100" value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>ราคา (บาท) *</label>
-                <input type="number" name="price" required min="0" step="0.01" value="<?= htmlspecialchars($_POST['price'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>สายพันธุ์ *</label>
-                <input type="text" name="breed" required maxlength="100" placeholder="เช่น เปอร์เซีย, สก็อตติช โฟลด์" value="<?= htmlspecialchars($_POST['breed'] ?? '') ?>">
-            </div>
-            <div class="form-group">
-                <label>รูปแมว (.jpg .png .webp)</label>
-                <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp">
-            </div>
-            <div class="form-group full">
-                <label>รายละเอียดพฤติกรรม</label>
-                <textarea name="description" placeholder="เช่น นิสัย ชอบเล่น ขี้อ้อน"><?= htmlspecialchars($_POST['description'] ?? '') ?></textarea>
-            </div>
+<div class="dashboard-layout">
+    <aside class="dash-sidebar">
+        <div class="dash-brand">🐾 Find my meow meow</div>
+        <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
+        <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
+        <a href="contact.php" class="dash-nav-item">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
+        <a href="buy_cat.php" class="dash-nav-item active">🛒 ซื้อแมว</a>
+        <a href="adopter.php" class="dash-nav-item">💬 ติดต่อผู้ขอรับเลี้ยง</a>
+        <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
+        <div style="margin-top: auto;">
+            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">🚪 ออกจากระบบ</a>
         </div>
-        <button type="submit" name="post_cat" class="btn" style="margin-top:12px;">📤 โพสต์ประกาศ</button>
-    </form>
-</div>
+    </aside>
 
-<h3 style="color:#d81b60;">แมวทั้งหมด (<?= count($cats) ?>)</h3>
-<?php if (!$cats): ?>
-    <div class="card muted">ยังไม่พบแมวที่ตรงกับการค้นหา ลองคำค้นอื่น หรือโพสต์ประกาศขายแมวเป็นคนแรก</div>
-<?php else: ?>
-<div class="cat-grid">
-    <?php foreach ($cats as $c): ?>
-    <div class="cat-card">
-        <img src="assets/images/<?= htmlspecialchars($c['Photos'] ?: 'cat.png') ?>" alt="<?= htmlspecialchars($c['Name']) ?>">
-        <div class="cat-body">
-            <h4><?= htmlspecialchars($c['Name']) ?></h4>
-            <div class="price"><?= number_format((float)$c['Price'], 2) ?> ฿</div>
-            <p style="margin:6px 0;"><span class="tag"><?= htmlspecialchars($c['Breed']) ?></span>
-               <span class="tag"><?= $c['Status'] === 'Available' ? 'ยังหาบ้านอยู่' : htmlspecialchars($c['Status']) ?></span></p>
-            <p class="muted" style="margin:6px 0 0;"><?= nl2br(htmlspecialchars((string)$c['BehaviorDescription'])) ?></p>
+    <main class="dash-main">
+        <h2 style="color: #d81b60; margin-top: 0;">🛒 ซื้อแมว (Buy Cat) 🐾</h2>
+        <input type="text" placeholder="🔍 ค้นหาแมวที่คุณรัก (Search your cat)..." style="width: 100%; padding: 12px 20px; border-radius: 20px; border: 1px solid #ffccd5; background: white; font-family: 'Kanit', sans-serif;">
+
+        <div class="catalog-grid">
+            <?php foreach($cat_list as $cat): ?>
+            <div class="cat-card">
+                <img src="assets/images/<?= $cat['img'] ?>" onerror="this.src='assets/images/student.jpg';">
+                <h4>ชื่อ <?= htmlspecialchars($cat['name']) ?></h4>
+                <div class="cat-price">ราคา <?= htmlspecialchars($cat['price']) ?> บาท</div>
+                <div class="cat-breed">สายพันธุ์ <?= htmlspecialchars($cat['breed']) ?></div>
+                <a href="#" class="btn-buy">🛒 สั่งซื้อ / ดูรายละเอียด</a>
+            </div>
+            <?php endforeach; ?>
         </div>
-    </div>
-    <?php endforeach; ?>
-</div>
-<?php endif; ?>
+    </main>
 
-<?php include 'layout_bottom.php'; ?>
+    <aside class="dash-right">
+        <div class="widget-box">
+            <?php
+                $prev_month = $month - 1; $prev_year = $year;
+                if ($prev_month < 1) { $prev_month = 12; $prev_year--; }
+                $next_month = $month + 1; $next_year = $year;
+                if ($next_month > 12) { $next_month = 1; $next_year++; }
+            ?>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 14px; color: #d81b60;">
+                <a href="?month=<?= $prev_month ?>&year=<?= $prev_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">‹</a>
+                <span><?= $month_names_th[$month] ?> <?= $year + 543 ?></span>
+                <a href="?month=<?= $next_month ?>&year=<?= $next_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">›</a>
+            </div>
+            <table class="calendar-table">
+                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
+                <tr>
+                <?php
+                $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
+                for ($i = 0; $i < 42; $i++) {
+                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
+                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
+                        $is_future = ($year > $today_y) || ($year == $today_y && $month > $today_m) || ($year == $today_y && $month == $today_m && $current_day > $today_d);
+                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
+                        elseif ($is_future) echo "<td><span class='cal-future'>{$current_day}</span></td>";
+                        else echo "<td><span class='cal-past'>{$current_day}</span></td>";
+                        $current_day++;
+                    } else { echo "<td></td>"; }
+                    if ($i % 7 == 6) echo "</tr><tr>";
+                }
+                ?>
+                </tr>
+            </table>
+        </div>
+        <div class="widget-box" style="text-align: left;">
+            <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
+            <ul class="world-time-list">
+                <li class="world-time-item"><span>🇹🇭 ไทย (UTC+7)</span> <strong id="time-th">--:--</strong></li>
+                <li class="world-time-item"><span>🇯🇵 ญี่ปุ่น (UTC+9)</span> <strong id="time-jp">--:--</strong></li>
+                <li class="world-time-item"><span>🇺🇸 สหรัฐฯ (UTC-4)</span> <strong id="time-us">--:--</strong></li>
+                <li class="world-time-item"><span>🇬🇧 สหราชอาณาจักร</span> <strong id="time-uk">--:--</strong></li>
+            </ul>
+        </div>
+    </aside>
+</div>
+
+<script>
+    function updateWorldTimes() {
+        const now = new Date();
+        document.getElementById('time-th').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('time-jp').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
+    }
+    setInterval(updateWorldTimes, 1000); updateWorldTimes();
+</script>
+</body>
+</html>

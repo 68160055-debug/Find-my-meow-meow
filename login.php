@@ -1,40 +1,43 @@
 <?php
-require_once 'auth.php';
-require_once 'config/db.php';
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
-// หากล็อกอินอยู่แล้ว ให้ข้ามไปยังหน้าหลัก index.php (ไม่ต้องล็อกอินซ้ำ)
+require 'auth.php';
+require 'config/db.php';
+
 if (!empty($_SESSION['user_id'])) {
-    header("Location: index.php");
-    exit();
+    header('Location: index.php'); exit;
 }
-
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_auth_token();
-
-    $email = trim((string)($_POST['email'] ?? ''));
+    $email = strtolower(trim((string)($_POST['email'] ?? '')));
     $password = (string)($_POST['password'] ?? '');
 
-    if ($email === '' || $password === '') {
-        $error = 'กรุณากรอกอีเมลและรหัสผ่าน';
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
+        $error = 'กรุณากรอกอีเมลและรหัสผ่านให้ถูกต้อง';
     } else {
-        $stmt = $conn->prepare("SELECT id, full_name, password FROM users WHERE email = ? LIMIT 1");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-
-        if ($user && password_verify($password, $user['password'])) {
-            // สร้าง Session ID ใหม่เพื่อป้องกัน Session Fixation
-            session_regenerate_id(true);
-            $_SESSION['user_id'] = (int)$user['id'];
-            $_SESSION['full_name'] = $user['full_name'];
-
-            header("Location: index.php");
-            exit();
+        $stmt = $conn->prepare("SELECT id, full_name, password_hash, profile_id FROM users WHERE email = ? LIMIT 1");
+        if (!$stmt) {
+            $error = 'DB error: ' . $conn->error;
         } else {
-            $error = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $user = $stmt->get_result()->fetch_assoc();
+
+            if ($user && password_verify($password, $user['password_hash'])) {
+                session_regenerate_id(true);
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['profile_id'] = (int)$user['profile_id'];
+                $_SESSION['full_name'] = $user['full_name'];
+                $_SESSION['email'] = $email;
+
+                header("Location: index.php");
+                exit();
+            } else {
+                $error = "อีเมลหรือรหัสผ่านไม่ถูกต้อง";
+            }
         }
     }
 }
@@ -43,140 +46,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="th">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>เข้าสู่ระบบ - Find my meow meow 💖</title>
+    <title>เข้าสู่ระบบ - Find my meow meow</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            background: #fff0f3;
-            font-family: 'Kanit', sans-serif;
-            color: #444;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .login-card {
-            background: #ffffff;
-            border-radius: 24px;
-            padding: 35px 30px;
-            width: 100%;
-            max-width: 420px;
-            border: 1px solid #ffccd5;
-            box-shadow: 0 8px 25px rgba(255, 117, 140, 0.15);
-            text-align: center;
-        }
-        .login-brand {
-            font-weight: bold;
-            font-size: 24px;
-            color: #d81b60;
-            margin-bottom: 8px;
-        }
-        .login-sub {
-            color: #777;
-            font-size: 14px;
-            margin-bottom: 25px;
-        }
-        .form-group {
-            text-align: left;
-            margin-bottom: 18px;
-        }
-        .form-group label {
-            display: block;
-            font-weight: 500;
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 6px;
-        }
-        .form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid #ffccd5;
-            border-radius: 14px;
-            font-size: 14px;
-            background: #fff8f9;
-            font-family: 'Kanit', sans-serif;
-            outline: none;
-            transition: border 0.2s;
-        }
-        .form-group input:focus {
-            border-color: #d81b60;
-        }
-        .btn-login {
-            background: #d81b60;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            font-family: 'Kanit', sans-serif;
-            box-shadow: 0 4px 12px rgba(216, 27, 96, 0.25);
-            transition: background 0.2s;
-        }
-        .btn-login:hover {
-            background: #ad1457;
-        }
-        .alert-error {
-            background: #ffe4e6;
-            color: #9f1239;
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 13px;
-            margin-bottom: 18px;
-            border: 1px solid #fecdd3;
-        }
-        .login-footer {
-            margin-top: 20px;
-            font-size: 13px;
-            color: #666;
-        }
-        .login-footer a {
-            color: #d81b60;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .login-footer a:hover {
-            text-decoration: underline;
-        }
-    </style>
 </head>
 <body>
+    <header class="navbar">
+        <div class="logo">🐾 Find my meow meow 💖</div>
+        <nav class="nav-links">
+            <a href="index.php">หน้าหลัก</a>
+            <a href="register.php" class="btn-reg">สมัครสมาชิก</a>
+            <a href="login.php" class="btn-login">เข้าสู่ระบบ</a>
+        </nav>
+    </header>
 
-<div class="login-card">
-    <div class="login-brand">🐾 Find my meow meow</div>
-    <div class="login-sub">ยินดีต้อนรับ เข้าสู่ระบบเพื่อดูแลน้องแมว 💖</div>
-
-    <?php if ($error !== ''): ?>
-        <div class="alert-error"><?= auth_escape($error) ?></div>
-    <?php endif; ?>
-
-    <form method="post" action="login.php">
-        <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
-
-        <div class="form-group">
-            <label for="email">📧 อีเมล (Email)</label>
-            <input type="email" id="email" name="email" placeholder="example@email.com" required autofocus>
+    <div class="login-wrapper">
+        <div class="login-banner">
+            <h2>Adopt · Care · Love 💖</h2>
+            <p>ยินดีต้อนรับกลับมา! เข้าสู่ระบบเพื่อใช้งาน Find my meow meow 💖</p>
+            <img src="assets/images/cat.png" alt="Cat" class="banner-cat-img" onerror="this.src='assets/images/student.jpg';">
         </div>
 
-        <div class="form-group">
-            <label for="password">🔒 รหัสผ่าน (Password)</label>
-            <input type="password" id="password" name="password" placeholder="••••••••" required>
+        <div class="login-card">
+            <div class="card-header">
+                <span>🐾</span>
+                <h2>เข้าสู่ระบบ</h2>
+            </div>
+            <p class="card-sub">เข้าสู่ระบบเพื่อใช้งาน Find my meow meow 💖</p>
+
+            <?php if(isset($_GET['registered'])): ?><p class="ok" style="color:green; font-size:13px; margin-bottom:10px;">สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ</p><?php endif; ?>
+            <?php if(isset($_GET['logged_out'])): ?><p class="ok" style="color:green; font-size:13px; margin-bottom:10px;">ออกจากระบบเรียบร้อยแล้ว</p><?php endif; ?>
+            <?php if($error): ?><p class="err" style="color:red; font-size:13px; margin-bottom:10px;"><?=auth_escape($error)?></p><?php endif; ?>
+
+            <form method="post">
+                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
+                <label>อีเมล</label>
+                <input type="email" name="email" required autocomplete="username" placeholder="name@example.com">
+                <label>รหัสผ่าน</label>
+                <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••">
+                
+                <div class="form-actions">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; cursor:pointer;">
+                        <input type="checkbox" name="remember" style="width:auto; margin:0;"> จำฉันไว้ในระบบ
+                    </label>
+                    <a href="#" class="forgot-link">ลืมรหัสผ่าน?</a>
+                </div>
+
+                <button type="submit" class="btn-submit">เข้าสู่ระบบ</button>
+            </form>
+            
+            <p class="register-prompt">
+                ยังไม่มีบัญชี? <a href="register.php">สมัครสมาชิกที่นี่</a>
+            </p>
+            <div style="text-align: center; margin-top: 15px;">
+                <a href="index.php" style="color: #666; font-size: 13px; text-decoration: none;">← กลับไปหน้าหลัก</a>
+            </div>
         </div>
-
-        <button type="submit" class="btn-login">เข้าสู่ระบบ / Sign In</button>
-    </form>
-
-    <div class="login-footer">
-        ยังไม่มีบัญชีผู้ใช้งาน? <a href="register.php">สมัครสมาชิกที่นี่</a>
     </div>
-</div>
-
 </body>
 </html>

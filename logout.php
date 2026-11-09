@@ -1,5 +1,5 @@
 <?php
-require_once 'auth.php';  // เดิมเป็น auth.php
+require 'auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_auth_token();
