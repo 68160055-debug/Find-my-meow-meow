@@ -1,91 +1,182 @@
 <?php
-require_once 'auth.php';  // เดิมเป็น auth.php
+require_once 'auth.php';
 require_once 'config/db.php';
-require_login();
 
-$user_id = $_SESSION['user_id'];
-$message = ''; $error = '';
-
-// จัดการโพสต์ใหม่
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_post'])) {
-    $content = trim($_POST['content'] ?? '');
-    $media_name = ''; $att_name = '';
-
-    if ($content !== '' || !empty($_FILES['media']['name']) || !empty($_FILES['attachment']['name'])) {
-        $upload_dir = 'assets/uploads/';
-        if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-
-        // อัปโหลดรูปภาพ (jpg, png)
-        if (isset($_FILES['media']) && $_FILES['media']['error'] === UPLOAD_ERR_OK) {
-            $ext = strtolower(pathinfo($_FILES['media']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['jpg', 'jpeg', 'png'])) {
-                $media_name = time() . '_img_' . basename($_FILES['media']['name']);
-                move_uploaded_file($_FILES['media']['tmp_name'], $upload_dir . $media_name);
-            } else { $error = 'รูปภาพรองรับเฉพาะ .jpg และ .png เท่านั้น'; }
-        }
-
-        // อัปโหลดไฟล์แนบเฉพาะ pdf, doc
-        if (!$error && isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
-            $ext = strtolower(pathinfo($_FILES['attachment']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['pdf', 'doc', 'docx'])) {
-                $att_name = time() . '_att_' . basename($_FILES['attachment']['name']);
-                move_uploaded_file($_FILES['attachment']['tmp_name'], $upload_dir . $att_name);
-            } else { $error = 'ไฟล์แนบรองรับเฉพาะ .pdf และ .doc/.docx เท่านั้น'; }
-        }
-
-        if (!$error) {
-            $stmt = $conn->prepare("INSERT INTO posts (user_id, content, media_path, attachment_path) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("isss", $user_id, $content, $media_name, $att_name);
-            $stmt->execute();
-            $stmt->close();
-            header("Location: index.php");
-            exit;
-        }
-    } else { $error = 'กรุณากรอกข้อความหรือแนบไฟล์อย่างน้อย 1 อย่าง'; }
-}
-
-// จัดการลบโพสต์
-if (isset($_GET['delete_post'])) {
-    $post_id = (int)$_GET['delete_post'];
-    $stmt = $conn->prepare("DELETE FROM posts WHERE id = ? AND user_id = ?");
-    $stmt->bind_param("ii", $post_id, $user_id);
-    $stmt->execute();
-    $stmt->close();
+// หากล็อกอินอยู่แล้ว ให้ข้ามไปยังหน้าหลัก index.php (ไม่ต้องล็อกอินซ้ำ)
+if (!empty($_SESSION['user_id'])) {
     header("Location: index.php");
-    exit;
+    exit();
 }
 
-// จัดการไลก์
-if (isset($_GET['like_post'])) {
-    $post_id = (int)$_GET['like_post'];
-    $conn->query("INSERT IGNORE INTO post_likes (post_id, user_id) VALUES ($post_id, $user_id)");
-    
-    // บันทึกแจ้งเตือนเจ้าของโพสต์
-    $owner_res = $conn->query("SELECT user_id FROM posts WHERE id = $post_id");
-    if ($owner_row = $owner_res->fetch_assoc()) {
-        if ($owner_row['user_id'] != $user_id) {
-            $conn->query("INSERT INTO notifications (user_id, message) VALUES ({$owner_row['user_id']}, 'มีผู้ใช้งานกดถูกใจโพสต์ของคุณ')");
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    check_auth_token();
+
+    $email = trim((string)($_POST['email'] ?? ''));
+    $password = (string)($_POST['password'] ?? '');
+
+    if ($email === '' || $password === '') {
+        $error = 'กรุณากรอกอีเมลและรหัสผ่าน';
+    } else {
+        $stmt = $conn->prepare("SELECT id, full_name, password FROM users WHERE email = ? LIMIT 1");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($user && password_verify($password, $user['password'])) {
+            // สร้าง Session ID ใหม่เพื่อป้องกัน Session Fixation
+            session_regenerate_id(true);
+            $_SESSION['user_id'] = (int)$user['id'];
+            $_SESSION['full_name'] = $user['full_name'];
+
+            header("Location: index.php");
+            exit();
+        } else {
+            $error = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
         }
     }
-    header("Location: index.php");
-    exit;
 }
-
-// ดึงรายการโพสต์พร้อมระบบค้นหา
-$search = trim($_GET['q'] ?? '');
-if ($search !== '') {
-    $s_param = "%$search%";
-    $stmt = $conn->prepare("SELECT p.*, u.full_name, u.avatar FROM posts p JOIN users u ON p.user_id = u.id WHERE p.content LIKE ? OR u.full_name LIKE ? ORDER BY p.id DESC");
-    $stmt->bind_param("ss", $s_param, $s_param);
-} else {
-    $stmt = $conn->prepare("SELECT p.*, u.full_name, u.avatar FROM posts p JOIN users u ON p.user_id = u.id ORDER BY p.id DESC");
-}
-$stmt->execute();
-$posts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-// ดึงการแจ้งเตือนของ User
-$notif_res = $conn->query("SELECT * FROM notifications WHERE user_id = $user_id ORDER BY id DESC LIMIT 5");
-$notifications = $notif_res->fetch_all(MYSQLI_ASSOC);
 ?>
-<!-- HTML Layout ของ index.php (โครงสร้าง 3 คอลัมน์ตามดีไซน์เดิม พร้อมเพิ่มฟอร์มโพสต์และแสดงรายการ) -->
+<!doctype html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>เข้าสู่ระบบ - Find my meow meow 💖</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            background: #fff0f3;
+            font-family: 'Kanit', sans-serif;
+            color: #444;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-card {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 35px 30px;
+            width: 100%;
+            max-width: 420px;
+            border: 1px solid #ffccd5;
+            box-shadow: 0 8px 25px rgba(255, 117, 140, 0.15);
+            text-align: center;
+        }
+        .login-brand {
+            font-weight: bold;
+            font-size: 24px;
+            color: #d81b60;
+            margin-bottom: 8px;
+        }
+        .login-sub {
+            color: #777;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            text-align: left;
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #ffccd5;
+            border-radius: 14px;
+            font-size: 14px;
+            background: #fff8f9;
+            font-family: 'Kanit', sans-serif;
+            outline: none;
+            transition: border 0.2s;
+        }
+        .form-group input:focus {
+            border-color: #d81b60;
+        }
+        .btn-login {
+            background: #d81b60;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            font-family: 'Kanit', sans-serif;
+            box-shadow: 0 4px 12px rgba(216, 27, 96, 0.25);
+            transition: background 0.2s;
+        }
+        .btn-login:hover {
+            background: #ad1457;
+        }
+        .alert-error {
+            background: #ffe4e6;
+            color: #9f1239;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin-bottom: 18px;
+            border: 1px solid #fecdd3;
+        }
+        .login-footer {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #666;
+        }
+        .login-footer a {
+            color: #d81b60;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .login-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-card">
+    <div class="login-brand">🐾 Find my meow meow</div>
+    <div class="login-sub">ยินดีต้อนรับ เข้าสู่ระบบเพื่อดูแลน้องแมว 💖</div>
+
+    <?php if ($error !== ''): ?>
+        <div class="alert-error"><?= auth_escape($error) ?></div>
+    <?php endif; ?>
+
+    <form method="post" action="login.php">
+        <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+
+        <div class="form-group">
+            <label for="email">📧 อีเมล (Email)</label>
+            <input type="email" id="email" name="email" placeholder="example@email.com" required autofocus>
+        </div>
+
+        <div class="form-group">
+            <label for="password">🔒 รหัสผ่าน (Password)</label>
+            <input type="password" id="password" name="password" placeholder="••••••••" required>
+        </div>
+
+        <button type="submit" class="btn-login">เข้าสู่ระบบ / Sign In</button>
+    </form>
+
+    <div class="login-footer">
+        ยังไม่มีบัญชีผู้ใช้งาน? <a href="register.php">สมัครสมาชิกที่นี่</a>
+    </div>
+</div>
+
+</body>
+</html>
