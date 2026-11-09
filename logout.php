@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header("Location: login.php?logged_out=1");
     exit();
 } else {
-    header("Location: profile.php");
+    header("Location: index.php");
     exit();
 }
 ?>

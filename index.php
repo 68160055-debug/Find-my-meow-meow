@@ -1,371 +1,319 @@
-
 <?php
 require 'auth.php';
 require 'config/db.php';
 require_login();
 
 $user_id = $_SESSION['user_id'];
-$message = '';
-$error = '';
-
-// จัดการเมื่อมีการส่งฟอร์มแก้ไขชื่อหรือรูปภาพ
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    check_auth_token();
-
-    // 1. แก้ไขชื่อ-นามสกุล
-    if (isset($_POST['update_name'])) {
-        $new_name = trim((string)($_POST['full_name'] ?? ''));
-        if ($new_name !== '') {
-            $stmt = $conn->prepare("UPDATE users SET full_name = ? WHERE id = ?");
-            $stmt->bind_param("si", $new_name, $user_id);
-            if ($stmt->execute()) {
-                $_SESSION['full_name'] = $new_name;
-                $message = 'เปลี่ยนชื่อเรียบร้อยแล้ว!';
-            } else {
-                $error = 'เกิดข้อผิดพลาดในการเปลี่ยนชื่อ';
-            }
-            $stmt->close();
-        } else {
-            $error = 'กรุณากรอกชื่อ-นามสกุล';
-        }
-    }
-
-    // 4. อัปเดตรูปภาพโปรไฟล์
-    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-        $file_tmp = $_FILES['avatar']['tmp_name'];
-        $original_name = basename($_FILES['avatar']['name']);
-        $file_name = time() . '_' . preg_replace("/[^a-zA-Z0-9\._-]/", "", $original_name);
-        $upload_dir = __DIR__ . '/assets/images/';
-        
-        // สร้างโฟลเดอร์อัตโนมัติหากยังไม่มี
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
-
-        $ext = strtolower(pathinfo($file_name, PATHINFO_EXTENSION));
-        $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        
-        if (in_array($ext, $allowed)) {
-            if (move_uploaded_file($file_tmp, $upload_dir . $file_name)) {
-                $stmt = $conn->prepare("UPDATE users SET avatar = ? WHERE id = ?");
-                $stmt->bind_param("si", $file_name, $user_id);
-                $stmt->execute();
-                $stmt->close();
-                
-                // รีเฟรชหน้าเพื่อแสดงรูปใหม่ทันที
-                header("Location: profile.php?success=avatar");
-                exit();
-            } else {
-                $error = 'ไม่สามารถบันทึกไฟล์รูปภาพได้ (ตรวจสอบสิทธิ์โฟลเดอร์ assets/images)';
-            }
-        } else {
-            $error = 'อนุญาตเฉพาะไฟล์รูปภาพ (jpg, jpeg, png, gif, webp) เท่านั้น';
-        }
-    }
-}
-
-// ดึงข้อมูลผู้ใช้ปัจจุบัน
-$stmt = $conn->prepare("SELECT full_name, email, avatar FROM users WHERE id = ? LIMIT 1");
+$stmt = $conn->prepare("SELECT full_name, email, avatar, status, country FROM users WHERE id = ? LIMIT 1");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
-$user = $stmt->get_result()->fetch_assoc();
+$current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+
+// กำหนดค่าเดือนและปีปัจจุบัน (รองรับการกดเปลี่ยนดูเดือนในอดีต)
+$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
+$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+
+// คำนวณปฏิทิน
+$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+$first_day_of_week = date('w', strtotime("$year-$month-01"));
+$month_names_th = [
+    1 => 'มกราคม', 2 => 'กุมภาพันธ์', 3 => 'มีนาคม', 4 => 'เมษายน', 
+    5 => 'พฤษภาคม', 6 => 'มิถุนายน', 7 => 'กรกฎาคม', 8 => 'สิงหาคม', 
+    9 => 'กันยายน', 10 => 'ตุลาคม', 11 => 'พฤศจิกายน', 12 => 'ธันวาคม'
+];
 ?>
 <!doctype html>
 <html lang="th">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>โปรไฟล์ของฉัน - Find my meow meow</title>
+    <title>หน้าหลัก Dashboard - Find my meow meow</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        .profile-card {
-            background: #ffffff;
-            border-radius: 16px;
-            padding: 30px;
-            max-width: 480px;
-            margin: 40px auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            font-family: 'Kanit', sans-serif;
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr 310px;
+            min-height: 100vh;
+            background: #fff0f3;
         }
-        .profile-title {
-            font-size: 22px;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 20px;
+        .dash-sidebar {
+            background: #ffffff;
+            border-right: 1px solid #ffccd5;
+            padding: 25px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .dash-nav-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-        }
-        .avatar-wrapper {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .avatar-label {
-            cursor: pointer;
-            display: inline-block;
-            position: relative;
-        }
-        .avatar-img {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            object-fit: cover;
-            border: 4px solid #ffb6c1;
-            transition: transform 0.2s, filter 0.2s;
-        }
-        .avatar-label:hover .avatar-img {
-            transform: scale(1.03);
-            filter: brightness(0.9);
-        }
-        .avatar-hint {
-            font-size: 12px;
-            color: #888;
-            margin-top: 6px;
-        }
-        .info-group {
-            margin-bottom: 15px;
-        }
-        .info-group label {
-            display: block;
-            font-weight: 600;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            text-decoration: none;
             color: #555;
-            margin-bottom: 5px;
-            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s, color 0.2s;
         }
-        .email-display {
-            background: #f8f9fa;
-            padding: 9px 12px;
-            border-radius: 8px;
-            color: #495057;
-            font-size: 14px;
-            border: 1px solid #e9ecef;
-        }
-        .input-flex {
-            display: flex;
-            gap: 8px;
-        }
-        .input-flex input[type="text"] {
-            flex: 1;
-            padding: 9px 12px;
-            border: 1px solid #ced4da;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-        .btn-edit {
+        .dash-nav-item.active, .dash-nav-item:hover {
             background: #ff758c;
             color: white;
-            border: none;
-            padding: 9px 15px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
         }
-        .btn-logout-main {
-            width: 100%;
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            padding: 11px;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            margin-top: 15px;
+        .dash-main {
+            padding: 20px 30px;
+            overflow-y: auto;
         }
-        .btn-logout-main:hover {
-            background-color: #c82333;
+        .top-dash-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: white;
+            padding: 12px 25px;
+            border-radius: 16px;
+            border: 1px solid #ffccd5;
         }
-        
-        /* Modal Popup จัดกึ่งกลางจออย่างสมบูรณ์ */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 9999;
-            justify-content: center;
+        .dash-search input {
+            padding: 8px 15px 8px 35px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            width: 320px;
+            background: #fafafa;
+        }
+        .notice-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .notice-card {
+            background: white;
+            border-radius: 14px;
+            padding: 15px;
+            border: 1px solid #ffccd5;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .post-box {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #ffccd5;
+            margin-bottom: 20px;
+        }
+        .post-input-row {
+            display: flex;
+            gap: 12px;
             align-items: center;
         }
-        .modal-box {
+        .post-input-row input {
+            flex: 1;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+        }
+        .feed-post-card {
             background: white;
-            border-radius: 12px;
-            padding: 25px;
-            width: 90%;
-            max-width: 340px;
-            text-align: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #ffccd5;
+            margin-bottom: 20px;
         }
-        .modal-actions {
+        .dash-right {
+            background: #ffffff;
+            border-left: 1px solid #ffccd5;
+            padding: 20px;
             display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 20px;
+            flex-direction: column;
+            gap: 20px;
         }
-        .btn-confirm-logout {
-            background: #dc3545;
+        .widget-box {
+            background: #fff8f9;
+            border-radius: 16px;
+            padding: 15px;
+            border: 1px solid #ffccd5;
+            text-align: center;
+        }
+        .calendar-table {
+            width: 100%;
+            font-size: 13px;
+            border-collapse: collapse;
+            text-align: center;
+        }
+        .calendar-table td, .calendar-table th {
+            padding: 6px;
+        }
+        .cal-today {
+            background: #d81b60;
             color: white;
-            border: none;
-            padding: 9px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
+            border-radius: 50%;
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
         }
-        .btn-cancel {
-            background: #e0e0e0;
+        .cal-past {
             color: #333;
-            border: none;
-            padding: 9px 18px;
-            border-radius: 6px;
             cursor: pointer;
-            font-weight: 600;
+        }
+        .cal-future {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+        .world-time-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            text-align: left;
+            font-size: 13px;
+        }
+        .world-time-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px dashed #ffccd5;
         }
     </style>
 </head>
 <body>
 
-<main class="container">
-    <div class="profile-card">
-        <div class="profile-title">
-            <span>🐾</span>
-            <span>โปรไฟล์ของฉัน</span>
+<div class="dashboard-layout">
+    <!-- Sidebar ด้านซ้าย -->
+    <aside class="dash-sidebar">
+        <div style="font-weight: bold; font-size: 18px; color: #d81b60; margin-bottom: 10px;">🐾 MyCommunity</div>
+        <a href="index.php" class="dash-nav-item active">🏠 หน้าแรก</a>
+        <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
+        <a href="#" class="dash-nav-item">📞 ติดต่อผู้ประกาศ</a>
+        <a href="#" class="dash-nav-item">⚙️ การตั้งค่า</a>
+        <div style="margin-top: auto;">
+            <a href="logout.php" class="dash-nav-item" style="background: #ff758c; color: white;">🚪 ออกจากระบบ</a>
         </div>
+    </aside>
 
-        <?php if(isset($_GET['success'])): ?><p style="color: green; font-size: 13px; margin-bottom: 10px;">อัปเดตสำเร็จ!</p><?php endif; ?>
-        <?php if($message): ?><p style="color: green; font-size: 13px; margin-bottom: 10px;"><?=auth_escape($message)?></p><?php endif; ?>
-        <?php if($error): ?><p style="color: red; font-size: 13px; margin-bottom: 10px;"><?=auth_escape($error)?></p><?php endif; ?>
-
-        <!-- อัปโหลดรูปภาพ -->
-        <div class="avatar-wrapper">
-            <form method="post" enctype="multipart/form-data" id="avatarForm">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <label class="avatar-label" title="คลิกเพื่อเปลี่ยนรูปโปรไฟล์">
-                    <?php 
-                        $avatar_file = !empty($user['avatar']) ? $user['avatar'] : 'student.jpg';
-                        $avatar_path = 'assets/images/' . $avatar_file;
-                    ?>
-                    <img src="<?= htmlspecialchars($avatar_path) ?>" 
-                         onerror="this.src='assets/images/student.jpg';" 
-                         class="avatar-img" 
-                         alt="Profile Picture">
-                    <input type="file" name="avatar" accept="image/*" style="display:none;" onchange="document.getElementById('avatarForm').submit();">
-                </label>
-                <div class="avatar-hint">คลิกที่รูปภาพเพื่อเลือกรูปจากเครื่อง / Drive</div>
-            </form>
-        </div>
-
-        <!-- แสดงอีเมล -->
-        <div class="info-group">
-            <label>อีเมลผู้ใช้งาน (Your Email)</label>
-            <div class="email-display"><?= htmlspecialchars($user['email']) ?></div>
-        </div>
-
-        <!-- แก้ไขชื่อ -->
-        <div class="info-group">
-            <label>ชื่อ-นามสกุล (Name-Surname)</label>
-            <form method="post">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <div class="input-flex">
-                    <input type="text" name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required>
-                    <button type="submit" name="update_name" class="btn-edit">แก้ไขชื่อ</button>
-                </div>
-            </form>
-        </div>
-
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-
-        <!-- แก้ไขชื่อเล่น -->
-         <label>ชื่อเล่น (Nickname)</label>
-            <form method="post">
-            <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <div class="input-flex">
-                    <input type="text" name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required>
-                    <button type="submit" name="update_name" class="btn-edit">แก้ไขชื่อ</button>
-                </div>
-            </form>
-        </div>
-
-      // แก้ไขเพศ
-      <?php
-    if (isset($_POST['update_gender'])) {
-        $gender = trim((string)($_POST['gender'] ?? ''));
-        $allowed_genders = ['female', 'male', 'other'];
-        if (in_array($gender, $allowed_genders)) {
-            $stmt = $conn->prepare("UPDATE users SET gender = ? WHERE id = ?");
-            $stmt->bind_param("si", $gender, $user_id);
-            if ($stmt->execute()) {
-                $message = 'อัปเดตเพศเรียบร้อยแล้ว!';
-            } else {
-                $error = 'เกิดข้อผิดพลาดในการอัปเดตเพศ';
-            }
-            $stmt->close();
-        } else {
-            $error = 'กรุณาเลือกเพศที่ถูกต้อง';
-        }
-    }
-      
-    // ดึงข้อมูลผู้ใช้ปัจจุบัน
-$stmt = $conn->prepare("SELECT full_name, email, avatar, gender FROM users WHERE id = ? LIMIT 1");
-?>
-        <!-- แก้ไขเพศ -->
-        <div class="info-group">
-            <label>เพศ (Gender)</label>
-            <form method="post">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <div class="input-flex">
-                    <select name="gender" style="flex: 1; padding: 9px 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 14px; background: white; font-family: 'Kanit', sans-serif;">
-                        <option value="female" <?= (isset($user['gender']) && $user['gender'] === 'female') ? 'selected' : '' ?>>หญิง (Female)</option>
-                        <option value="male" <?= (isset($user['gender']) && $user['gender'] === 'male') ? 'selected' : '' ?>>ชาย (Male)</option>
-                        <option value="other" <?= (isset($user['gender']) && $user['gender'] === 'other') ? 'selected' : '' ?>>อื่นๆ / ไม่ระบุ</option>
-                    </select>
-                    <button type="submit" name="update_gender" class="btn-edit">บันทึก</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- แก้ไขอายุ -->
-        <div class="info-group">
-            <label>อายุ</lable>
-            <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <div class="input-flex">
-                    <input type="text" name="full_name" value="<?= htmlspecialchars($user['full_name']) ?>" required>
-                    <button type="submit" name="update_name" class="btn-edit">แก้ไขอายุ</button>
-                </div>
-               </form>
+    <!-- Main Content ตรงกลาง -->
+    <main class="dash-main">
+        <header class="top-dash-header">
+            <div class="dash-search" style="position: relative;">
+                <span style="position: absolute; left: 12px; top: 9px;">🔍</span>
+                <input type="text" placeholder="ค้นหาโพสต์, ผู้ใช้...">
             </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span>🔔 1</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <?php $avatar = !empty($current_user['avatar']) ? $current_user['avatar'] : 'student.jpg'; ?>
+                    <img src="assets/images/<?= htmlspecialchars($avatar) ?>" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover;">
+                    <strong style="font-size: 14px; color: #333;"><?= htmlspecialchars($current_user['full_name']) ?></strong>
+                </div>
+            </div>
+        </header>
 
-        <!-- แก้ไขสถานะ/อาชีพ -->
-        <div class="info-group">
-            <label>สถานะ/อาชีพ</lable>
-            
-            
-        <!-- ปุ่มออกจากระบบ (สีแดงอยู่ล่างสุด) -->
-        <button type="button" class="btn-logout-main" onclick="showLogoutModal()">ออกจากระบบ</button>
-    </div>
-</main>
-
-<!-- Modal ยืนยันการออกจากระบบ -->
-<div id="logoutModal" class="modal-overlay">
-    <div class="modal-box">
-        <h3 style="margin-top:0; color:#333;">คุณแน่ใจหรือไม่?</h3>
-        <p style="color: #666; font-size: 14px; margin: 10px 0 20px 0;">คุณแน่ใจหรือไม่ว่าต้องการจะออกจากระบบ</p>
-        <div class="modal-actions">
-            <form action="logout.php" method="post">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
-                <button type="submit" class="btn-confirm-logout">ออกจากระบบ</button>
-            </form>
-            <button type="button" class="btn-cancel" onclick="hideLogoutModal()">ยกเลิก</button>
+        <div class="notice-grid">
+            <div class="notice-card"><span>📢</span><div><strong style="font-size: 13px; color: #d81b60;">ข่าวสาร</strong><p style="font-size: 12px; color: #666; margin:0;">อัปเดตล่าสุด</p></div></div>
+            <div class="notice-card"><span>📋</span><div><strong style="font-size: 13px; color: #d81b60;">กฎกติกา</strong><p style="font-size: 12px; color: #666; margin:0;">อ่านก่อนใช้งาน</p></div></div>
+            <div class="notice-card"><span>💡</span><div><strong style="font-size: 13px; color: #d81b60;">การเข้าเว็บ</strong><p style="font-size: 12px; color: #666; margin:0;">คู่มือการใช้งาน</p></div></div>
         </div>
-    </div>
+
+        <div class="post-box">
+            <div class="post-input-row">
+                <img src="assets/images/<?= htmlspecialchars($avatar) ?>" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                <input type="text" placeholder="คุณอยากโพสต์อะไรวันนี้...">
+                <button type="button" style="background: #d81b60; color: white; border: none; padding: 10px 20px; border-radius: 20px; font-weight: 600; cursor: pointer;">แชร์</button>
+            </div>
+        </div>
+
+        <div class="feed-post-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <img src="assets/images/student.jpg" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                <div><strong>CatLover</strong><div style="font-size: 11px; color: #888;">2 ชม. ที่แล้ว</div></div>
+            </div>
+            <p style="font-size: 14px; color: #444;">น้องเหมียวตัวน้อยกับของเล่นชิ้นโปรด เล่นเพลินจนเหนื่อยเลย~ 💖🐾</p>
+        </div>
+    </main>
+
+    <!-- Right Sidebar ด้านขวา -->
+    <aside class="dash-right">
+        <div class="widget-box">
+            <img src="assets/images/<?= htmlspecialchars($avatar) ?>" style="width: 75px; height: 75px; border-radius: 50%; object-fit: cover; border: 3px solid #ff758c; margin-bottom: 8px;">
+            <h3 style="font-size: 16px; color: #333; margin-bottom: 2px;"><?= htmlspecialchars($current_user['full_name']) ?></h3>
+            <p style="font-size: 12px; color: #d81b60; margin-bottom: 12px;"><?= htmlspecialchars($current_user['status'] ?? 'สมาชิกทั่วไป') ?></p>
+            <a href="profile.php" style="display: inline-block; background: #ffccd5; color: #d81b60; padding: 6px 16px; border-radius: 12px; text-decoration: none; font-size: 13px; font-weight: 600;">ดูโปรไฟล์</a>
+        </div>
+
+        <!-- ปฏิทินไดนามิก (ย้อนดูอดีตได้ / ล็อกอนาคต) -->
+        <div class="widget-box">
+            <?php
+                // คำนวณปุ่มเลื่อนเดือนย้อนกลับ / ไปข้างหน้า
+                $prev_month = $month - 1; $prev_year = $year;
+                if ($prev_month < 1) { $prev_month = 12; $prev_year--; }
+                $next_month = $month + 1; $next_year = $year;
+                if ($next_month > 12) { $next_month = 1; $next_year++; }
+            ?>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: #d81b60;">
+                <a href="?month=<?= $prev_month ?>&year=<?= $prev_year ?>" style="text-decoration:none; color:#d81b60;">‹</a>
+                <span><?= $month_names_th[$month] ?> <?= $year + 543 ?></span>
+                <a href="?month=<?= $next_month ?>&year=<?= $next_year ?>" style="text-decoration:none; color:#d81b60;">›</a>
+            </div>
+            <table class="calendar-table">
+                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
+                <tr>
+                <?php
+                $current_day = 1;
+                $today_d = (int)date('j');
+                $today_m = (int)date('n');
+                $today_y = (int)date('Y');
+
+                for ($i = 0; $i < 42; $i++) {
+                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
+                        // เช็คว่าเป็นวันปัจจุบัน, อดีต หรืออนาคต
+                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
+                        $is_future = ($year > $today_y) || ($year == $today_y && $month > $today_m) || ($year == $today_y && $month == $today_m && $current_day > $today_d);
+
+                        if ($is_today) {
+                            echo "<td><span class='cal-today'>{$current_day}</span></td>";
+                        } elseif ($is_future) {
+                            echo "<td><span class='cal-future'>{$current_day}</span></td>"; // วันอนาคต (กดไม่ได้)
+                        } else {
+                            echo "<td><span class='cal-past' title='เลือกดูวันที่นี้'>{$current_day}</span></td>"; // วันในอดีต (กดดูได้)
+                        }
+                        $current_day++;
+                    } else {
+                        echo "<td></td>";
+                    }
+                    if ($i % 7 == 6) echo "</tr><tr>";
+                }
+                ?>
+                </tr>
+            </table>
+        </div>
+
+        <!-- เวลาปัจจุบันตามโซนเวลาสากลจริง (รองรับปรับเปลี่ยนตามประเทศที่ผู้ใช้เลือก) -->
+        <div class="widget-box" style="text-align: left;">
+            <h4 style="font-size: 13px; color: #d81b60; margin-bottom: 8px;">🕒 เวลาปัจจุบันตามประเทศ</h4>
+            <ul class="world-time-list">
+                <li class="world-time-item"><span>🇹🇭 ไทย (UTC+7)</span> <strong id="time-th">--:--</strong></li>
+                <li class="world-time-item"><span>🇯🇵 ญี่ปุ่น (UTC+9)</span> <strong id="time-jp">--:--</strong></li>
+                <li class="world-time-item"><span>🇺🇸 สหรัฐ (UTC-4)</span> <strong id="time-us">--:--</strong></li>
+                <li class="world-time-item"><span>🇬🇧 สหราชอาณาจักร</span> <strong id="time-uk">--:--</strong></li>
+            </ul>
+        </div>
+    </aside>
 </div>
 
 <script>
-    function showLogoutModal() {
-        document.getElementById('logoutModal').style.display = 'flex';
+    // Script อัปเดตเวลาสากลแบบเรียลไทม์
+    function updateWorldTimes() {
+        const now = new Date();
+        document.getElementById('time-th').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('time-jp').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
+        document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
     }
-    function hideLogoutModal() {
-        document.getElementById('logoutModal').style.display = 'none';
-    }
+    setInterval(updateWorldTimes, 1000);
+    updateWorldTimes();
 </script>
 
 </body>
