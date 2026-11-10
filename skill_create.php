@@ -24,3 +24,5 @@ if($error)echo '<p class="err">'.h($error).'</p>';
 echo '<div class="alert">Student task: complete the INSERT SQL in skill_create.php.</div>';
 ?>
 <form method="post"><?php csrf_field(); ?><label for="skill">Skill name</label><input id="skill" name="skill_name" required maxlength="120" value="<?=h($name)?>"><label for="level">Skill level</label><select id="level" name="skill_level"><?php foreach(['Beginner','Intermediate','Advanced'] as $choice)echo '<option '.($choice===$level?'selected':'').'>'.h($choice).'</option>';?></select><p><button type="submit">Save new skill</button></p></form><?php page_end(); ?>
+
+
