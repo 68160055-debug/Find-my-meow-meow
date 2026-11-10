@@ -31,13 +31,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             mysqli_begin_transaction($conn);
             try {
+                // 1. เพิ่มโปรไฟล์ในตาราง profile
                 $ps = $conn->prepare("INSERT INTO profile (full_name, headline, email, phone, address, about_me, photo) VALUES (?, '', ?, '', '', '', 'student.jpg')");
                 $ps->bind_param("ss", $full_name, $email);
                 $ps->execute();
                 $new_profile_id = $conn->insert_id;
                 $ps->close();
 
-                $insert = $conn->prepare("INSERT INTO users (profile_id, full_name, email, password_hash) VALUES (?, ?, ?, ?)");
+                // 2. เพิ่มผู้ใช้ในตาราง users พร้อมกำหนดค่า status, gender, avatar เริ่มต้น เพื่อไม่ให้ติด Field doesn't have default value
+                $insert = $conn->prepare("INSERT INTO users (profile_id, full_name, email, password_hash, status, gender, avatar, nickname, phone, bio) VALUES (?, ?, ?, ?, 'นักเรียน/นักศึกษา', 'female', 'student.jpg', '', '', '')");
                 $insert->bind_param("isss", $new_profile_id, $full_name, $email, $password_hash);
                 $insert->execute();
                 $insert->close();
