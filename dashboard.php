@@ -3,6 +3,10 @@ require 'auth.php';
 require 'config/db.php';
 require_login();
 ?>
+<main class="dash-main">
+    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+    <?php include 'config/search.php'; ?>
+    
 <!doctype html>
 <html lang="th">
 <head>

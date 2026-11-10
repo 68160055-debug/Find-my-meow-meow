@@ -6,6 +6,10 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
+<main class="dash-main">
+    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+    <?php include 'config/search.php'; ?>
+
 $user_id = $_SESSION['user_id'];
 $month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
 $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');

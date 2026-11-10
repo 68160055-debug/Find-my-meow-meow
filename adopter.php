@@ -6,6 +6,10 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
+<main class="dash-main">
+    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+    <?php include 'config/search.php'; ?>
+
 $user_id = $_SESSION['user_id'] ?? 0;
 
 // ดึงข้อมูลผู้ใช้งานปัจจุบัน
