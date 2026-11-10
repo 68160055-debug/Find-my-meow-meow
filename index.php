@@ -293,10 +293,7 @@ $month_names_th = [
         <header class="top-dash-header">
             <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
             <?php include 'config/search.php'; ?>
-            <div class="dash-search">
-                <span style="position: absolute; left: 14px; top: 10px; color: #aaa;">🔍</span>
-                <input type="text" placeholder="ค้นหาโพสต์, ชื่อผู้ใช้...">
-            </div>
+                
             <div style="display: flex; align-items: center; gap: 15px;">
                 <span style="font-size: 18px; cursor: pointer;">🔔</span>
                 <div style="display: flex; align-items: center; gap: 10px;">
