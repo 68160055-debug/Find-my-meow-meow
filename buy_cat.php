@@ -13,14 +13,50 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 $first_day_of_week = date('w', strtotime("$year-$month-01"));
 $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
 
-// รายการแมวตัวอย่าง (เพิ่ม id สำหรับส่งต่อไปหน้าถัดไป)
+// รายการแมวแยกตามสายพันธุ์และระบุไฟล์รูปภาพ
 $cat_list = [
-    ['id' => 1, 'name' => 'Mochi', 'price' => '12,000', 'original_price' => '12,000', 'sale_price' => '10,000', 'breed' => 'บริติช ชอร์ตแฮร์', 'img' => 'student.jpg', 'desc' => 'น้องแมวสุขภาพดี ร่าเริง เลี้ยงดูอย่างดี พร้อมย้ายบ้าน สนใจสามารถติดต่อสอบถามได้ค่ะ'],
-    ['id' => 2, 'name' => 'Leo', 'price' => '8,500', 'original_price' => '10,000', 'sale_price' => '8,500', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png', 'desc' => 'เปอร์เซียแท้ ขนแน่น นุ่ม สุขภาพแข็งแรง ขี้อ้อนมาก'],
-    ['id' => 3, 'name' => 'Luna', 'price' => '8,500', 'original_price' => '9,900', 'sale_price' => '8,500', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'student.jpg', 'desc' => 'สก็อตติช โฟลด์ หูพับ น่ารัก ทานเก่ง ขับถ่ายในกระบะทรายเป็นแล้ว'],
-    ['id' => 4, 'name' => 'Lonera', 'price' => '12,000', 'original_price' => '13,500', 'sale_price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png', 'desc' => 'เพศเมีย สุขภาพดี ได้รับวัคซีนเข็มแรกแล้ว'],
-    ['id' => 5, 'name' => 'Lunnavan', 'price' => '12,000', 'original_price' => '14,000', 'sale_price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'student.jpg', 'desc' => 'ขี้เล่น ซน น่ารักมาก เข้ากับคนง่าย'],
-    ['id' => 6, 'name' => 'Lluna', 'price' => '12,000', 'original_price' => '12,000', 'sale_price' => '12,000', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'cat.png', 'desc' => 'ตาแป๋ว ขนฟู แข็งแรง พร้อมย้ายบ้านทันที']
+    [
+        'id' => 1,
+        'name' => 'Mochi',
+        'price' => '12,000',
+        'breed' => 'บริติช ชอร์ตแฮร์',
+        'img' => 'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?w=600&auto=format&fit=crop&q=80' // รูปบริติช ชอร์ตแฮร์
+    ],
+    [
+        'id' => 2,
+        'name' => 'Leo',
+        'price' => '8,500',
+        'breed' => 'เปอร์เซีย',
+        'img' => 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=600&auto=format&fit=crop&q=80' // รูปเปอร์เซียสีส้ม
+    ],
+    [
+        'id' => 3,
+        'name' => 'Luna',
+        'price' => '8,500',
+        'breed' => 'สก็อตติช โฟลด์',
+        'img' => 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=600&auto=format&fit=crop&q=80' // รูปสก็อตติช โฟลด์
+    ],
+    [
+        'id' => 4,
+        'name' => 'Lonera',
+        'price' => '12,000',
+        'breed' => 'เปอร์เซีย',
+        'img' => 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=600&auto=format&fit=crop&q=80' // รูปเปอร์เซีย
+    ],
+    [
+        'id' => 5,
+        'name' => 'Lunnavan',
+        'price' => '12,000',
+        'breed' => 'เปอร์เซีย',
+        'img' => 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600&auto=format&fit=crop&q=80' // รูปเปอร์เซียขาว/ครีม
+    ],
+    [
+        'id' => 6,
+        'name' => 'Lluna',
+        'price' => '12,000',
+        'breed' => 'สก็อตติช โฟลด์',
+        'img' => 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=600&auto=format&fit=crop&q=80' // รูปสก็อตติช โฟลด์
+    ]
 ];
 ?>
 <!doctype html>
@@ -42,7 +78,26 @@ $cat_list = [
         .dash-main { padding: 25px 30px; overflow-y: auto; }
         .catalog-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
         .cat-card { background: white; border-radius: 18px; padding: 15px; border: 1px solid #ffccd5; box-shadow: 0 4px 15px rgba(0,0,0,0.02); text-align: center; }
-        .cat-card img { width: 100%; height: 160px; object-fit: cover; border-radius: 14px; margin-bottom: 10px; }
+        
+        /* สไตล์สำหรับรูปภาพในการ์ด */
+        .cat-card-img-box {
+            width: 100%;
+            height: 170px;
+            border-radius: 14px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            background: #ffe6ea;
+        }
+        .cat-card-img-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .cat-card:hover .cat-card-img-box img {
+            transform: scale(1.05);
+        }
+
         .cat-card h4 { margin: 5px 0; color: #333; font-size: 16px; }
         .cat-price { color: #d81b60; font-weight: bold; font-size: 14px; margin-bottom: 4px; }
         .cat-breed { color: #888; font-size: 12px; margin-bottom: 12px; }
@@ -62,7 +117,6 @@ $cat_list = [
 <body>
 
 <div class="dashboard-layout">
-    <!-- แถบด้านซ้าย -->
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
         <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
@@ -84,18 +138,18 @@ $cat_list = [
         <div class="catalog-grid">
             <?php foreach($cat_list as $cat): ?>
             <div class="cat-card">
-                <img src="assets/images/<?= $cat['img'] ?>" onerror="this.src='assets/images/student.jpg';">
+                <div class="cat-card-img-box">
+                    <img src="<?= htmlspecialchars($cat['img']) ?>" alt="<?= htmlspecialchars($cat['name']) ?>">
+                </div>
                 <h4>ชื่อ <?= htmlspecialchars($cat['name']) ?></h4>
                 <div class="cat-price">ราคา <?= htmlspecialchars($cat['price']) ?> บาท</div>
                 <div class="cat-breed">สายพันธุ์ <?= htmlspecialchars($cat['breed']) ?></div>
-                <!-- ส่ง id ไปที่หน้า cat_detail.php -->
                 <a href="cat_detail.php?id=<?= $cat['id']; ?>" class="btn-buy">🛒 สั่งซื้อ / ดูรายละเอียด</a>
             </div>
             <?php endforeach; ?>
         </div>
     </main>
 
-    <!-- แถบด้านขวา -->
     <aside class="dash-right">
         <div class="widget-box">
             <?php

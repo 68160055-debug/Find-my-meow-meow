@@ -13,14 +13,56 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 $first_day_of_week = date('w', strtotime("$year-$month-01"));
 $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
 
-// ฐานข้อมูลแมวตัวอย่าง
+// ฐานข้อมูลแมวตัวอย่างตามสายพันธุ์
 $cat_list = [
-    1 => ['name' => 'แมวบริติช ชอร์ตแฮร์ หาบ้านใหม่', 'normal_price' => 12000, 'sale_price' => 10000, 'breed' => 'บริติช ชอร์ตแฮร์', 'img' => 'student.jpg', 'desc' => 'น้องแมวสุขภาพดี ร่าเริง เลี้ยงดูอย่างดี พร้อมย้ายบ้าน สนใจสามารถติดต่อสอบถามได้ค่ะ'],
-    2 => ['name' => 'น้อง Leo เปอร์เซียแท้ขนฟู', 'normal_price' => 10000, 'sale_price' => 8500, 'breed' => 'เปอร์เซีย', 'img' => 'cat.png', 'desc' => 'เปอร์เซียแท้ ขนแน่น นุ่ม สุขภาพแข็งแรง ขี้อ้อนมาก'],
-    3 => ['name' => 'น้อง Luna สก็อตติช โฟลด์', 'normal_price' => 9900, 'sale_price' => 8500, 'breed' => 'สก็อตติช โฟลด์', 'img' => 'student.jpg', 'desc' => 'สก็อตติช โฟลด์ หูพับ น่ารัก ทานเก่ง ขับถ่ายในกระบะทรายเป็นแล้ว'],
-    4 => ['name' => 'Lonera สาวน้อยเปอร์เซีย', 'normal_price' => 13500, 'sale_price' => 12000, 'breed' => 'เปอร์เซีย', 'img' => 'cat.png', 'desc' => 'เพศเมีย สุขภาพดี ได้รับวัคซีนเข็มแรกแล้ว'],
-    5 => ['name' => 'Lunnavan หนุ่มน้อยจอมซน', 'normal_price' => 14000, 'sale_price' => 12000, 'breed' => 'เปอร์เซีย', 'img' => 'student.jpg', 'desc' => 'ขี้เล่น ซน น่ารักมาก เข้ากับคนง่าย'],
-    6 => ['name' => 'Lluna สก็อตติช โฟลด์ น่ารัก', 'normal_price' => 12000, 'sale_price' => 12000, 'breed' => 'สก็อตติช โฟลด์', 'img' => 'cat.png', 'desc' => 'ตาแป๋ว ขนฟู แข็งแรง พร้อมย้ายบ้านทันที']
+    1 => [
+        'name' => 'แมวบริติช ชอร์ตแฮร์ หาบ้านใหม่',
+        'normal_price' => 12000,
+        'sale_price' => 10000,
+        'breed' => 'บริติช ชอร์ตแฮร์',
+        'img' => 'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?w=800&auto=format&fit=crop&q=80',
+        'desc' => 'น้องแมวสุขภาพดี ร่าเริง เลี้ยงดูอย่างดี พร้อมย้ายบ้าน สนใจสามารถติดต่อสอบถามได้ค่ะ'
+    ],
+    2 => [
+        'name' => 'น้อง Leo เปอร์เซียแท้ขนฟู',
+        'normal_price' => 10000,
+        'sale_price' => 8500,
+        'breed' => 'เปอร์เซีย',
+        'img' => 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=800&auto=format&fit=crop&q=80',
+        'desc' => 'เปอร์เซียแท้ ขนแน่น นุ่ม สุขภาพแข็งแรง ขี้อ้อนมาก'
+    ],
+    3 => [
+        'name' => 'น้อง Luna สก็อตติช โฟลด์ หูพับ',
+        'normal_price' => 9900,
+        'sale_price' => 8500,
+        'breed' => 'สก็อตติช โฟลด์',
+        'img' => 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=800&auto=format&fit=crop&q=80',
+        'desc' => 'สก็อตติช โฟลด์ หูพับ น่ารัก ทานเก่ง ขับถ่ายในกระบะทรายเป็นแล้ว'
+    ],
+    4 => [
+        'name' => 'Lonera สาวน้อยเปอร์เซียสีส้ม',
+        'normal_price' => 13500,
+        'sale_price' => 12000,
+        'breed' => 'เปอร์เซีย',
+        'img' => 'https://images.unsplash.com/photo-1543852786-1cf6624b9987?w=800&auto=format&fit=crop&q=80',
+        'desc' => 'เพศเมีย สุขภาพดี ได้รับวัคซีนเข็มแรกแล้ว'
+    ],
+    5 => [
+        'name' => 'Lunnavan หนุ่มน้อยจอมซน',
+        'normal_price' => 14000,
+        'sale_price' => 12000,
+        'breed' => 'เปอร์เซีย',
+        'img' => 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=800&auto=format&fit=crop&q=80',
+        'desc' => 'ขี้เล่น ซน น่ารักมาก เข้ากับคนง่าย'
+    ],
+    6 => [
+        'name' => 'Lluna สก็อตติช โฟลด์ ตาแป๋ว',
+        'normal_price' => 12000,
+        'sale_price' => 12000,
+        'breed' => 'สก็อตติช โฟลด์',
+        'img' => 'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=800&auto=format&fit=crop&q=80',
+        'desc' => 'ตาแป๋ว ขนฟู แข็งแรง พร้อมย้ายบ้านทันที'
+    ]
 ];
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 1;
@@ -43,16 +85,13 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
         body { margin: 0; background: #fff0f3; font-family: 'Kanit', sans-serif; color: #444; }
         .dashboard-layout { display: grid; grid-template-columns: 260px 1fr 310px; min-height: 100vh; }
         
-        /* Sidebar ซ้าย */
         .dash-sidebar { background: #ffffff; border-right: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; height: 100vh; }
         .dash-brand { font-weight: bold; font-size: 20px; color: #d81b60; margin-bottom: 15px; }
         .dash-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; text-decoration: none; color: #555; font-weight: 500; font-size: 15px; transition: all 0.2s; }
         .dash-nav-item.active, .dash-nav-item:hover { background: #ff758c; color: white; box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3); }
 
-        /* Main เนื้อหากลาง */
         .dash-main { padding: 25px 30px; overflow-y: auto; }
         
-        /* สไตล์ฟอร์มตัวอย่างแบบรูปที่ 2 */
         .post-card-container {
             background: #ffffff;
             border-radius: 20px;
@@ -92,14 +131,15 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
         .image-preview-box {
             position: relative;
             width: 100%;
-            height: 320px;
-            background: #f7a5b5;
+            height: 330px;
+            background: #fdf2f4;
             border-radius: 16px;
             overflow: hidden;
             display: flex;
             justify-content: center;
             align-items: center;
             margin-bottom: 8px;
+            border: 1px solid #ffccd5;
         }
         .image-preview-box img {
             width: 100%;
@@ -179,7 +219,6 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
             font-size: 14px;
         }
 
-        /* Sidebar ขวา */
         .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
         .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
         .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
@@ -194,7 +233,6 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
 <body>
 
 <div class="dashboard-layout">
-    <!-- แถบด้านซ้ายคงเดิม -->
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
         <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
@@ -208,7 +246,6 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
         </div>
     </aside>
 
-    <!-- ตรงกลาง: แบบฟอร์มแสดงรายละเอียดตามรูปที่ 2 -->
     <main class="dash-main">
         <a href="buy_cat.php" class="btn-back">‹ ย้อนกลับไปหน้าซื้อแมว</a>
 
@@ -230,8 +267,9 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
 
             <div class="form-group">
                 <label>รูปภาพแมว</label>
+                <!-- กล่องแสดงรูปแมวของสายพันธุ์นั้นๆ -->
                 <div class="image-preview-box">
-                    <img src="assets/images/<?= $cat['img'] ?>" onerror="this.src='assets/images/student.jpg';">
+                    <img src="<?= htmlspecialchars($cat['img']) ?>" alt="<?= htmlspecialchars($cat['name']) ?>">
                 </div>
                 <div class="image-helper">
                     <span>🖼️ เพิ่มรูปภาพหลายรูปได้</span>
@@ -276,7 +314,6 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
         </div>
     </main>
 
-    <!-- แถบด้านขวาคงเดิม -->
     <aside class="dash-right">
         <div class="widget-box">
             <?php
