@@ -15,181 +15,200 @@ $stmt->execute();
 $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
-$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
-$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-$first_day_of_week = date('w', strtotime("$year-$month-01"));
-$month_names_th = [
-    1 => 'มกราคม', 2 => 'กุมภาพันธ์', 3 => 'มีนาคม', 4 => 'เมษายน', 
-    5 => 'พฤษภาคม', 6 => 'มิถุนายน', 7 => 'กรกฎาคม', 8 => 'สิงหาคม', 
-    9 => 'กันยายน', 10 => 'ตุลาคม', 11 => 'พฤศจิกายน', 12 => 'ธันวาคม'
-];
+$current_avatar = !empty($current_user['avatar']) ? $current_user['avatar'] : 'student.jpg';
+$current_name = !empty($current_user['full_name']) ? $current_user['full_name'] : 'ผู้ใช้งาน';
+
+// กำหนดประวัติข้อความเริ่มต้นถ้ายังไม่มี
+if (!isset($_SESSION['chat_history'])) {
+    $_SESSION['chat_history'] = [
+        ['sender' => 'other', 'name' => 'MeowLover', 'text' => 'สวัสดีค่ะ ยินดีที่ได้คุยกันนะคะ 🌸💕', 'time' => '15:42'],
+        ['sender' => 'me', 'name' => $current_name, 'text' => 'ขอบคุณค่ะ มีน้องแมวให้ดูเพิ่มเติมไหมคะ 🥰', 'time' => '15:45'],
+        ['sender' => 'other', 'name' => 'MeowLover', 'text' => 'ยินดีค่ะ มีอะไรสอบถามได้เลยนะคะ 😊', 'time' => '15:46']
+    ];
+}
+
+// ระบบรับและส่งข้อความแชตด้วยเพียว PHP (Form POST)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['chat_message'])) {
+    $msg = trim((string)$_POST['chat_message']);
+    if ($msg !== '') {
+        $_SESSION['chat_history'][] = [
+            'sender' => 'me',
+            'name' => $current_name,
+            'text' => $msg,
+            'time' => date('H:i')
+        ];
+        header("Location: adopter.php");
+        exit();
+    }
+}
 ?>
 <!doctype html>
 <html lang="th">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ติดต่อผู้ขอรับเลี้ยง - Find my meow meow 💖</title>
+    <title>แชทติดต่อผู้ขอรับเลี้ยง - Find my meow meow 💖</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; background: #fff0f3; font-family: 'Kanit', sans-serif; color: #444; }
-        .dashboard-layout { display: grid; grid-template-columns: 260px 1fr 310px; min-height: 100vh; }
-        .dash-sidebar { background: #ffffff; border-right: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; height: 100vh; }
-        .dash-brand { font-weight: bold; font-size: 20px; color: #d81b60; margin-bottom: 15px; }
-        .dash-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; text-decoration: none; color: #555; font-weight: 500; font-size: 15px; transition: all 0.2s; }
+        body { margin: 0; background: #fff0f5; font-family: 'Kanit', sans-serif; color: #444; }
+        .chat-app-layout { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+        
+        /* แถบเมนูด้านซ้าย */
+        .dash-sidebar { background: #ffffff; border-right: 1.5px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 10px; position: sticky; top: 0; height: 100vh; }
+        .brand-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        .brand-header .paw-icon { font-size: 28px; color: #ff4081; }
+        .brand-title { font-weight: bold; font-size: 19px; color: #d81b60; line-height: 1.2; }
+        
+        .dash-nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-radius: 16px; text-decoration: none; color: #555; font-weight: 500; font-size: 14px; transition: all 0.2s; }
         .dash-nav-item.active, .dash-nav-item:hover { background: #ff758c; color: white; box-shadow: 0 4px 12px rgba(255, 117, 140, 0.3); }
-        .dash-main { padding: 25px 30px; overflow-y: auto; }
-        .chat-container { background: white; border-radius: 20px; border: 1px solid #ffccd5; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.02); display: flex; flex-direction: column; height: calc(100vh - 100px); }
-        .chat-box { flex: 1; overflow-y: auto; padding: 15px; background: #fff8f9; border-radius: 16px; margin: 15px 0; border: 1px solid #ffccd5; display: flex; flex-direction: column; gap: 12px; }
-        .chat-msg { display: flex; gap: 10px; align-items: flex-start; }
-        .chat-msg.me { flex-direction: row-reverse; }
-        .chat-bubble { background: white; padding: 10px 16px; border-radius: 16px; border: 1px solid #ffccd5; max-width: 65%; font-size: 14px; word-break: break-word; }
-        .chat-msg.me .chat-bubble { background: #ff758c; color: white; border: none; }
-        .chat-input-row { display: flex; gap: 10px; align-items: center; }
-        .chat-input-row input { flex: 1; padding: 12px 20px; border-radius: 20px; border: 1px solid #ffccd5; outline: none; font-family: 'Kanit', sans-serif; font-size: 14px; }
-        .btn-send { background: #d81b60; color: white; border: none; padding: 11px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; transition: 0.2s; }
-        .btn-send:hover { background: #c2185b; }
-        .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
-        .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
-        .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
-        .calendar-table td, .calendar-table th { padding: 6px 2px; }
-        .cal-today { background: #d81b60; color: white; border-radius: 50%; display: inline-block; width: 24px; height: 24px; line-height: 24px; font-weight: 600; }
-        .cal-past { color: #333; }
-        .cal-future { color: #ccc; }
-        .world-time-list { list-style: none; padding: 0; margin: 0; text-align: left; font-size: 13px; }
-        .world-time-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ffccd5; }
+        .dash-nav-item .icon { font-size: 18px; }
+        
+        /* พื้นที่แชตหลัก */
+        .chat-main-area { padding: 20px 30px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* แถบค้นหาด้านบนสุด */
+        .top-search-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 25px; background: #ffffff; border-radius: 20px; border: 1.5px solid #ffccd5; margin-bottom: 18px; box-shadow: 0 4px 15px rgba(255, 117, 140, 0.05); }
+        .search-form { display: flex; align-items: center; flex: 1; max-width: 550px; position: relative; }
+        .search-form input { width: 100%; padding: 10px 45px 10px 42px; border-radius: 25px; border: 1.5px solid #ffccd5; background: #fff8f9; font-family: 'Kanit'; font-size: 14px; outline: none; }
+        .search-form .btn-search { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: #d81b60; color: white; border: none; border-radius: 15px; padding: 5px 14px; font-size: 12px; cursor: pointer; font-family: 'Kanit'; }
+        
+        /* หน้าต่างแชต */
+        .chat-card { background: white; border-radius: 24px; border: 1.5px solid #ffccd5; display: flex; flex-direction: column; flex: 1; box-shadow: 0 6px 20px rgba(0,0,0,0.02); overflow: hidden; }
+        .chat-header-bar { padding: 16px 24px; background: #fff8f9; border-bottom: 1.5px solid #ffccd5; display: flex; justify-content: space-between; align-items: center; }
+        .chat-user-profile { display: flex; align-items: center; gap: 14px; }
+        .chat-avatar-wrap { position: relative; }
+        .chat-avatar-wrap img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ff758c; }
+        .online-dot { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; background: #4caf50; border: 2px solid white; border-radius: 50%; }
+        
+        .chat-body-scroll { flex: 1; overflow-y: auto; padding: 25px; background: #fffafb; display: flex; flex-direction: column; gap: 16px; }
+        .msg-row { display: flex; gap: 12px; align-items: flex-end; }
+        .msg-row.me { flex-direction: row-reverse; }
+        .msg-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
+        .msg-bubble { max-width: 65%; padding: 12px 18px; border-radius: 20px; font-size: 14px; line-height: 1.5; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+        .msg-row.other .msg-bubble { background: white; border: 1.5px solid #ffccd5; color: #333; border-bottom-left-radius: 4px; }
+        .msg-row.me .msg-bubble { background: #ff6584; color: white; border-bottom-right-radius: 4px; }
+        .msg-time { font-size: 11px; color: #999; margin: 0 6px; }
+        
+        /* แถบพิมพ์ข้อความด้านล่าง */
+        .chat-footer-bar { padding: 16px 24px; background: white; border-top: 1.5px solid #ffccd5; }
+        .input-form { display: flex; gap: 12px; align-items: center; }
+        .chat-text-input { flex: 1; padding: 14px 22px; border-radius: 25px; border: 1.5px solid #ffccd5; background: #fff8f9; font-family: 'Kanit'; font-size: 14px; outline: none; }
+        .btn-send-pink { background: #ff4081; color: white; border: none; border-radius: 25px; padding: 12px 28px; font-weight: 600; cursor: pointer; font-family: 'Kanit'; font-size: 14px; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+        .btn-send-pink:hover { background: #d81b60; }
+        
+        /* สติกเกอร์ข้อความด่วน */
+        .quick-replies { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 4px; }
+        .btn-quick-sticker { background: #fff0f3; border: 1px solid #ffccd5; color: #d81b60; padding: 5px 14px; border-radius: 15px; font-size: 12px; cursor: pointer; font-family: 'Kanit'; white-space: nowrap; }
     </style>
 </head>
 <body>
 
-<div class="dashboard-layout">
+<div class="chat-app-layout">
+    <!-- แถบเมนูด้านซ้าย (สไตล์ Meow Meow) -->
     <aside class="dash-sidebar">
-        <div class="dash-brand">🐾 Find my meow meow</div>
-        <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
-        <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
-        <a href="contact.php" class="dash-nav-item">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
-        <a href="buy_cat.php" class="dash-nav-item">🛒 ซื้อแมว</a>
-        <a href="adopter.php" class="dash-nav-item active">💬 ติดต่อผู้ขอรับเลี้ยง</a>
-        <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
+        <div class="brand-header">
+            <span class="paw-icon">🐾</span>
+            <div class="brand-title">Find my<br>meow meow ♡</div>
+        </div>
+        <a href="index.php" class="dash-nav-item">
+            <span class="icon">🏠</span> หน้าแรก (Home)
+        </a>
+        <a href="profile.php" class="dash-nav-item">
+            <span class="icon">👤</span> ประวัติผู้ใช้งาน (Profile)
+        </a>
+        <a href="contact.php" class="dash-nav-item">
+            <span class="icon">✉️</span> ติดต่อผู้ประกาศ/แอดมิน (Contact Us)
+        </a>
+        <a href="buy_cat.php" class="dash-nav-item">
+            <span class="icon">🛒</span> ซื้อแมว (Buy Cat)
+        </a>
+        <a href="settings.php" class="dash-nav-item">
+            <span class="icon">⚙️</span> การตั้งค่า (Settings)
+        </a>
+        <a href="adopter.php" class="dash-nav-item active">
+            <span class="icon">🐾</span> ติดต่อผู้ขอรับเลี้ยง (Adopter)
+        </a>
         <div style="margin-top: auto;">
-            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">🚪 ออกจากระบบ</a>
+            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">
+                <span class="icon">🚪</span> ออกจากระบบ (Logout)
+            </a>
         </div>
     </aside>
 
-    <main class="dash-main">
-         <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-        <?php include 'config/search.php'; ?>
-        <div class="chat-container">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                  
-                    <h3 style="color: #d81b60; margin: 0;">💬 แชตติดต่อผู้ขอรับเลี้ยง</h3>
-                    <small style="color: #888;">คู่สนทนา: คุณสมชาย (ผู้ขอรับเลี้ยงน้องส้ม)</small>
-                </div>
-                <span style="font-size: 13px; color: #2e7d32; font-weight: 500;">🟢 ออนไลน์</span>
-            </div>
-
-            <div class="chat-box" id="chatBox">
-                <div class="chat-msg">
-                    <img src="assets/images/student.jpg" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover;">
-                    <div class="chat-bubble">สวัสดีครับ ผมสนใจอยากขอรับเลี้ยงน้องแมวที่ลงประกาศไว้ครับ ไม่ทราบว่ามีนัดดูตัวน้องได้แถวไหนบ้างครับ? 🐱</div>
-                </div>
-                <div class="chat-msg me">
-                    <div class="chat-bubble">สวัสดีครับ สะดวกแถวมหาวิทยาลัยบูรพา บางแสน ครับผม มีประวัติฉีดวัคซีนครบถ้วนแล้วครับ</div>
-                </div>
-                <div class="chat-msg">
-                    <img src="assets/images/student.jpg" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover;">
-                    <div class="chat-bubble">เยี่ยมเลยครับ สะดวกเป็นวันเสาร์ช่วงบ่ายไหมครับ?</div>
-                </div>
-            </div>
-
-            <form class="chat-input-row" id="chatForm" onsubmit="sendMessage(event)">
-                <input type="text" id="chatInput" placeholder="พิมพ์ข้อความพูดคุยที่นี่..." autocomplete="off" required>
-                <button type="submit" class="btn-send">ส่งข้อความ</button>
+    <!-- พื้นที่แชตหลัก -->
+    <main class="chat-main-area">
+        <!-- 1. แถบค้นหาด้านบนสุด (สำหรับค้นหาทุกหน้าตามเงื่อนไข) -->
+        <header class="top-search-header">
+            <form action="search_results.php" method="GET" class="search-form">
+                <span style="position: absolute; left: 16px; font-size: 16px; color: #d81b60;">🔍</span>
+                <input type="text" name="q" placeholder="ค้นหาชื่อคน, ชื่อโพสต์, แอดมิน..." required>
+                <button type="submit" class="btn-search">ค้นหา</button>
             </form>
+            <div style="display: flex; align-items: center; gap: 18px;">
+                <span style="font-size: 20px; color: #ff758c; cursor: pointer;">🔔</span>
+                <a href="profile.php" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
+                    <img src="assets/images/<?= htmlspecialchars($current_avatar) ?>" onerror="this.src='assets/images/student.jpg';" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #ff758c;">
+                    <strong style="font-size: 14px; color: #333;"><?= htmlspecialchars($current_name) ?></strong>
+                </a>
+            </div>
+        </header>
+
+        <!-- 2. หน้าต่างแชต -->
+        <div class="chat-card">
+            <!-- ส่วนหัวแชต -->
+            <div class="chat-header-bar">
+                <div class="chat-user-profile">
+                    <div class="chat-avatar-wrap">
+                        <img src="assets/images/cat.png" onerror="this.src='assets/images/student.jpg';">
+                        <span class="online-dot"></span>
+                    </div>
+                    <div>
+                        <strong style="font-size: 16px; color: #d81b60;">MeowLover</strong>
+                        <div style="font-size: 12px; color: #4caf50;">● ออนไลน์ (Online)</div>
+                    </div>
+                </div>
+                <div style="font-size: 13px; color: #888;">🐾 แชตหาบ้านให้น้องแมว</div>
+            </div>
+
+            <!-- กล่องแสดงข้อความที่แชตคุยกัน -->
+            <div class="chat-body-scroll">
+                <?php foreach ($_SESSION['chat_history'] as $c): ?>
+                    <div class="msg-row <?= $c['sender'] === 'me' ? 'me' : 'other' ?>">
+                        <img src="assets/images/<?= $c['sender'] === 'me' ? htmlspecialchars($current_avatar) : 'cat.png' ?>" class="msg-avatar" onerror="this.src='assets/images/student.jpg';">
+                        <div class="msg-bubble"><?= htmlspecialchars($c['text']) ?></div>
+                        <span class="msg-time"><?= htmlspecialchars($c['time']) ?></span>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+
+            <!-- กล่องพิมพ์ส่งข้อความ (เพียว HTML Form POST + PHP) -->
+            <div class="chat-footer-bar">
+                <form method="POST" action="adopter.php" class="input-form">
+                    <input type="text" name="chat_message" class="chat-text-input" placeholder="พิมพ์ข้อความ... / Type a message..." required autocomplete="off">
+                    <button type="submit" class="btn-send-pink">ส่งข้อความ ✈</button>
+                </form>
+
+                <!-- ปุ่มส่งข้อความด่วน (กดแล้วส่งผ่าน Form ได้ทันที) -->
+                <div class="quick-replies">
+                    <form method="POST" action="adopter.php" style="display:inline;">
+                        <input type="hidden" name="chat_message" value="ขอบคุณค่ะ 🥰">
+                        <button type="submit" class="btn-quick-sticker">🥰 ขอบคุณค่ะ</button>
+                    </form>
+                    <form method="POST" action="adopter.php" style="display:inline;">
+                        <input type="hidden" name="chat_message" value="สนใจรับเลี้ยงน้องแมวค่ะ 🐱💕">
+                        <button type="submit" class="btn-quick-sticker">🐱 สนใจรับเลี้ยงน้องแมวค่ะ</button>
+                    </form>
+                    <form method="POST" action="adopter.php" style="display:inline;">
+                        <input type="hidden" name="chat_message" value="สะดวกนัดรับแถวไหนคะ? 📍">
+                        <button type="submit" class="btn-quick-sticker">📍 สะดวกนัดรับแถวไหนคะ?</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </main>
-
-    <aside class="dash-right">
-        <div class="widget-box">
-            <?php
-                $prev_month = $month - 1; $prev_year = $year;
-                if ($prev_month < 1) { $prev_month = 12; $prev_year--; }
-                $next_month = $month + 1; $next_year = $year;
-                if ($next_month > 12) { $next_month = 1; $next_year++; }
-            ?>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 14px; color: #d81b60;">
-                <a href="?month=<?= $prev_month ?>&year=<?= $prev_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">‹</a>
-                <span><?= $month_names_th[$month] ?> <?= $year + 543 ?></span>
-                <a href="?month=<?= $next_month ?>&year=<?= $next_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">›</a>
-            </div>
-            <table class="calendar-table">
-                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
-                <tr>
-                <?php
-                $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
-                for ($i = 0; $i < 42; $i++) {
-                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
-                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
-                        $is_future = ($year > $today_y) || ($year == $today_y && $month > $today_m) || ($year == $today_y && $month == $today_m && $current_day > $today_d);
-                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
-                        elseif ($is_future) echo "<td><span class='cal-future'>{$current_day}</span></td>";
-                        else echo "<td><span class='cal-past'>{$current_day}</span></td>";
-                        $current_day++;
-                    } else { echo "<td></td>"; }
-                    if ($i % 7 == 6) echo "</tr><tr>";
-                }
-                ?>
-                </tr>
-            </table>
-        </div>
-
-        <div class="widget-box" style="text-align: left;">
-            <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
-            <ul class="world-time-list">
-                <li class="world-time-item"><span>🇹🇭 ไทย (UTC+7)</span> <strong id="time-th">--:--</strong></li>
-                <li class="world-time-item"><span>🇯🇵 ญี่ปุ่น (UTC+9)</span> <strong id="time-jp">--:--</strong></li>
-                <li class="world-time-item"><span>🇺🇸 สหรัฐฯ (UTC-4)</span> <strong id="time-us">--:--</strong></li>
-                <li class="world-time-item"><span>🇬🇧 สหราชอาณาจักร</span> <strong id="time-uk">--:--</strong></li>
-            </ul>
-        </div>
-    </aside>
 </div>
 
-<script>
-    function updateWorldTimes() {
-        const now = new Date();
-        document.getElementById('time-th').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-jp').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
-    }
-    setInterval(updateWorldTimes, 1000); updateWorldTimes();
-
-    function sendMessage(e) {
-        e.preventDefault();
-        const input = document.getElementById('chatInput');
-        const text = input.value.trim();
-        if (!text) return;
-
-        const chatBox = document.getElementById('chatBox');
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'chat-msg me';
-        msgDiv.innerHTML = `<div class="chat-bubble">${escapeHtml(text)}</div>`;
-        chatBox.appendChild(msgDiv);
-
-        input.value = '';
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function escapeHtml(string) {
-        const div = document.createElement('div');
-        div.innerText = string;
-        return div.innerHTML;
-    }
-</script>
 </body>
 </html>
