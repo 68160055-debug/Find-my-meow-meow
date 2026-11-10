@@ -13,14 +13,14 @@ $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 $first_day_of_week = date('w', strtotime("$year-$month-01"));
 $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
 
-// รายการแมวตัวอย่าง
+// รายการแมวตัวอย่าง (เพิ่ม id สำหรับส่งต่อไปหน้าถัดไป)
 $cat_list = [
-    ['name' => 'Mochi', 'price' => '12,000', 'breed' => 'บริติช ชอร์ตแฮร์', 'img' => 'student.jpg'],
-    ['name' => 'Leo', 'price' => '8,500', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png'],
-    ['name' => 'Luna', 'price' => '8,500', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'student.jpg'],
-    ['name' => 'Lonera', 'price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png'],
-    ['name' => 'Lunnavan', 'price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'student.jpg'],
-    ['name' => 'Lluna', 'price' => '12,000', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'cat.png']
+    ['id' => 1, 'name' => 'Mochi', 'price' => '12,000', 'original_price' => '12,000', 'sale_price' => '10,000', 'breed' => 'บริติช ชอร์ตแฮร์', 'img' => 'student.jpg', 'desc' => 'น้องแมวสุขภาพดี ร่าเริง เลี้ยงดูอย่างดี พร้อมย้ายบ้าน สนใจสามารถติดต่อสอบถามได้ค่ะ'],
+    ['id' => 2, 'name' => 'Leo', 'price' => '8,500', 'original_price' => '10,000', 'sale_price' => '8,500', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png', 'desc' => 'เปอร์เซียแท้ ขนแน่น นุ่ม สุขภาพแข็งแรง ขี้อ้อนมาก'],
+    ['id' => 3, 'name' => 'Luna', 'price' => '8,500', 'original_price' => '9,900', 'sale_price' => '8,500', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'student.jpg', 'desc' => 'สก็อตติช โฟลด์ หูพับ น่ารัก ทานเก่ง ขับถ่ายในกระบะทรายเป็นแล้ว'],
+    ['id' => 4, 'name' => 'Lonera', 'price' => '12,000', 'original_price' => '13,500', 'sale_price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'cat.png', 'desc' => 'เพศเมีย สุขภาพดี ได้รับวัคซีนเข็มแรกแล้ว'],
+    ['id' => 5, 'name' => 'Lunnavan', 'price' => '12,000', 'original_price' => '14,000', 'sale_price' => '12,000', 'breed' => 'เปอร์เซีย', 'img' => 'student.jpg', 'desc' => 'ขี้เล่น ซน น่ารักมาก เข้ากับคนง่าย'],
+    ['id' => 6, 'name' => 'Lluna', 'price' => '12,000', 'original_price' => '12,000', 'sale_price' => '12,000', 'breed' => 'สก็อตติช โฟลด์', 'img' => 'cat.png', 'desc' => 'ตาแป๋ว ขนฟู แข็งแรง พร้อมย้ายบ้านทันที']
 ];
 ?>
 <!doctype html>
@@ -46,7 +46,7 @@ $cat_list = [
         .cat-card h4 { margin: 5px 0; color: #333; font-size: 16px; }
         .cat-price { color: #d81b60; font-weight: bold; font-size: 14px; margin-bottom: 4px; }
         .cat-breed { color: #888; font-size: 12px; margin-bottom: 12px; }
-        .btn-buy { background: #ff758c; color: white; border: none; padding: 8px 18px; border-radius: 15px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; text-decoration: none; display: inline-block; font-size: 13px; }
+        .btn-buy { background: #ff758c; color: white; border: none; padding: 8px 18px; border-radius: 15px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; text-decoration: none; display: inline-block; font-size: 13px; transition: all 0.2s; }
         .btn-buy:hover { background: #d81b60; }
         .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
         .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
@@ -62,15 +62,13 @@ $cat_list = [
 <body>
 
 <div class="dashboard-layout">
+    <!-- แถบด้านซ้าย -->
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
         <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
         <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
         <a href="contact.php" class="dash-nav-item">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
         <a href="buy_cat.php" class="dash-nav-item active">🛒 ซื้อแมว</a>
-        <a href="cat_detail.php?id=<?= $cat['id']; ?>" class="btn-detail">
-    🛒 สั่งซื้อ / ดูรายละเอียด
-</a>
         <a href="adopter.php" class="dash-nav-item">💬 ติดต่อผู้ขอรับเลี้ยง</a>
         <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
         <div style="margin-top: auto;">
@@ -80,7 +78,6 @@ $cat_list = [
 
     <main class="dash-main">
         <h2 style="color: #d81b60; margin-top: 0;">🛒 ซื้อแมว (Buy Cat) 🐾</h2>
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
         <?php include 'config/search.php'; ?>   
         <input type="text" placeholder="🔍 ค้นหาแมวที่คุณรัก (Search your cat)..." style="width: 100%; padding: 12px 20px; border-radius: 20px; border: 1px solid #ffccd5; background: white; font-family: 'Kanit', sans-serif;">
 
@@ -91,12 +88,14 @@ $cat_list = [
                 <h4>ชื่อ <?= htmlspecialchars($cat['name']) ?></h4>
                 <div class="cat-price">ราคา <?= htmlspecialchars($cat['price']) ?> บาท</div>
                 <div class="cat-breed">สายพันธุ์ <?= htmlspecialchars($cat['breed']) ?></div>
-                <a href="#" class="btn-buy">🛒 สั่งซื้อ / ดูรายละเอียด</a>
+                <!-- ส่ง id ไปที่หน้า cat_detail.php -->
+                <a href="cat_detail.php?id=<?= $cat['id']; ?>" class="btn-buy">🛒 สั่งซื้อ / ดูรายละเอียด</a>
             </div>
             <?php endforeach; ?>
         </div>
     </main>
 
+    <!-- แถบด้านขวา -->
     <aside class="dash-right">
         <div class="widget-box">
             <?php
