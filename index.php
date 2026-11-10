@@ -2,6 +2,9 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
+// ตั้งค่า Timezone ประเทศไทยเป็นมาตรฐาน
+date_default_timezone_set('Asia/Bangkok');
+
 require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
@@ -43,17 +46,6 @@ $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 $avatar_img = !empty($current_user['avatar']) ? $current_user['avatar'] : 'student.jpg';
-
-// คำนวณปฏิทิน
-$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
-$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
-$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-$first_day_of_week = date('w', strtotime("$year-$month-01"));
-$month_names_th = [
-    1 => 'มกราคม', 2 => 'กุมภาพันธ์', 3 => 'มีนาคม', 4 => 'เมษายน', 
-    5 => 'พฤษภาคม', 6 => 'มิถุนายน', 7 => 'กรกฎาคม', 8 => 'สิงหาคม', 
-    9 => 'กันยายน', 10 => 'ตุลาคม', 11 => 'พฤศจิกายน', 12 => 'ธันวาคม'
-];
 ?>
 <!doctype html>
 <html lang="th">
@@ -82,13 +74,6 @@ $month_names_th = [
         .feed-user-info img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
         .post-actions { display: flex; gap: 10px; margin-top: 15px; border-top: 1px solid #fff0f3; padding-top: 12px; }
         .act-btn { background: #fff0f3; border: 1px solid #ffccd5; border-radius: 14px; padding: 8px 18px; font-size: 13px; color: #d81b60; cursor: pointer; font-family: 'Kanit', sans-serif; }
-        .dash-right { background: #ffffff; border-left: 1px solid #ffccd5; padding: 25px 20px; display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; height: 100vh; }
-        .widget-box { background: #fff8f9; border-radius: 18px; padding: 18px; border: 1px solid #ffccd5; text-align: center; }
-        .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
-        .calendar-table td, .calendar-table th { padding: 6px 2px; }
-        .cal-today { background: #d81b60; color: white; border-radius: 50%; display: inline-block; width: 24px; height: 24px; line-height: 24px; font-weight: 600; }
-        .world-time-list { list-style: none; padding: 0; margin: 0; text-align: left; font-size: 13px; }
-        .world-time-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ffccd5; }
     </style>
 </head>
 <body>
@@ -113,7 +98,7 @@ $month_names_th = [
         <!-- แถบค้นหาด้านบน -->
         <?php if (file_exists('config/search.php')) include 'config/search.php'; ?>
 
-        <!-- กล่อง HTML Form แชร์โพสต์ (เพียว HTML + PHP) -->
+        <!-- กล่องแชร์โพสต์ -->
         <form method="POST" action="index.php" class="post-box">
             <div class="post-input-row">
                 <img src="assets/images/<?= htmlspecialchars($avatar_img) ?>" onerror="this.src='assets/images/student.jpg';" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover;">
@@ -122,7 +107,7 @@ $month_names_th = [
             </div>
         </form>
 
-        <!-- แสดงโพสต์ใหม่ที่ผู้ใช้เพิ่งโพสต์ผ่าน PHP -->
+        <!-- แสดงโพสต์ใหม่ที่ผู้ใช้เพิ่งโพสต์ -->
         <?php if (!empty($_SESSION['user_posts'])): ?>
             <?php foreach ($_SESSION['user_posts'] as $p): ?>
                 <div class="feed-card">
@@ -171,36 +156,8 @@ $month_names_th = [
         </div>
     </main>
 
-    <!-- 3. แถบขวามือ (Right Sidebar) -->
-    <aside class="dash-right">
-        <div class="widget-box">
-            <img src="assets/images/<?= htmlspecialchars($avatar_img) ?>" onerror="this.src='assets/images/student.jpg';" style="width: 75px; height: 75px; border-radius: 50%; object-fit: cover; border: 3px solid #ff758c; margin-bottom: 8px;">
-            <h3 style="font-size: 16px; color: #333; margin: 0 0 4px 0;"><?= htmlspecialchars($current_user['full_name']) ?></h3>
-            <p style="font-size: 12px; color: #d81b60; margin: 0 0 12px 0;"><?= htmlspecialchars($current_user['status'] ?? 'นักเรียน/นักศึกษา') ?></p>
-            <a href="profile.php" style="display: inline-block; background: #ffccd5; color: #d81b60; padding: 6px 18px; border-radius: 14px; text-decoration: none; font-size: 13px; font-weight: 600;">ดูโปรไฟล์</a>
-        </div>
-
-        <div class="widget-box">
-            <h4 style="margin: 0 0 8px 0; color: #d81b60; font-size: 14px;">📅 ปฏิทิน <?= $month_names_th[$month] ?> <?= $year + 543 ?></h4>
-            <table class="calendar-table">
-                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
-                <tr>
-                <?php
-                $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
-                for ($i = 0; $i < 42; $i++) {
-                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
-                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
-                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
-                        else echo "<td style='color:#555;'>{$current_day}</td>";
-                        $current_day++;
-                    } else { echo "<td></td>"; }
-                    if ($i % 7 == 6) echo "</tr><tr>";
-                }
-                ?>
-                </tr>
-            </table>
-        </div>
-    </aside>
+    <!-- 3. แถบขวามือ: รวมปฏิทินและเวลามาตรฐานเดียวกับทุกหน้า -->
+    <?php include 'config/rightbar.php'; ?>
 </div>
 </body>
 </html>
