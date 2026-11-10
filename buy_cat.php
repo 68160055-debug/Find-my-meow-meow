@@ -68,6 +68,9 @@ $cat_list = [
         <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
         <a href="contact.php" class="dash-nav-item">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
         <a href="buy_cat.php" class="dash-nav-item active">🛒 ซื้อแมว</a>
+        <a href="cat_detail.php?id=<?= $cat['id']; ?>" class="btn-detail">
+    🛒 สั่งซื้อ / ดูรายละเอียด
+</a>
         <a href="adopter.php" class="dash-nav-item">💬 ติดต่อผู้ขอรับเลี้ยง</a>
         <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
         <div style="margin-top: auto;">
