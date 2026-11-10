@@ -6,10 +6,6 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
-<main class="dash-main">
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-    <?php include 'config/search.php'; ?>
-
 $user_id = $_SESSION['user_id'];
 $month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
 $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
@@ -81,6 +77,8 @@ $cat_list = [
 
     <main class="dash-main">
         <h2 style="color: #d81b60; margin-top: 0;">🛒 ซื้อแมว (Buy Cat) 🐾</h2>
+    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+        <?php include 'config/search.php'; ?>   
         <input type="text" placeholder="🔍 ค้นหาแมวที่คุณรัก (Search your cat)..." style="width: 100%; padding: 12px 20px; border-radius: 20px; border: 1px solid #ffccd5; background: white; font-family: 'Kanit', sans-serif;">
 
         <div class="catalog-grid">

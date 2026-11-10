@@ -6,10 +6,6 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
-<main class="dash-main">
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-    <?php include 'config/search.php'; ?>
-
 $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
@@ -110,6 +106,8 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
 
     <!-- ตรงกลาง -->
     <main class="dash-main">
+         <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+        <?php include 'config/search.php'; ?>
         <h2 style="color: #d81b60; margin-top: 0; margin-bottom: 20px;">⚙️ การตั้งค่า (Settings)</h2>
 
         <?php if($message): ?><p style="color: green; font-size: 14px; background: #e8f5e9; padding: 10px; border-radius: 10px;"><?=auth_escape($message)?></p><?php endif; ?>

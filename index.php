@@ -6,10 +6,6 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
-<main class="dash-main">
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-    <?php include 'config/search.php'; ?>
-    
 $user_id = $_SESSION['user_id'];
 
 // ดึงข้อมูลผู้ใช้งานปัจจุบัน
@@ -295,6 +291,8 @@ $month_names_th = [
     <!-- พื้นที่ตรงกลาง (Main Content) -->
     <main class="dash-main">
         <header class="top-dash-header">
+            <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+            <?php include 'config/search.php'; ?>
             <div class="dash-search">
                 <span style="position: absolute; left: 14px; top: 10px; color: #aaa;">🔍</span>
                 <input type="text" placeholder="ค้นหาโพสต์, ชื่อผู้ใช้...">

@@ -6,10 +6,6 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
-<main class="dash-main">
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-    <?php include 'config/search.php'; ?>
-
 $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
@@ -84,7 +80,10 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
             <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">🚪 ออกจากระบบ</a>
         </div>
     </aside>
-
+    <main class="dash-main">
+        <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+        <?php include 'config/search.php'; ?>
+        
     <main class="dash-main">
         <div class="contact-card">
             <h2 style="color: #d81b60; margin-top: 0;">✉️ ติดต่อผู้ประกาศ/แอดมิน (Contact Us)</h2>

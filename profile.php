@@ -6,10 +6,6 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
-<main class="dash-main">
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-    <?php include 'config/search.php'; ?>
-    
 $user_id = $_SESSION['user_id'];
 $message = '';
 $error = '';
@@ -384,6 +380,8 @@ $month_names_th = [
 
     <!-- พื้นที่ตรงกลาง (Main Content) -->
     <main class="dash-main">
+        <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+        <?php include 'config/search.php'; ?>
         <div class="profile-card">
             <h2 style="color: #d81b60; margin-top: 0; margin-bottom: 20px;">🐾 โปรไฟล์ของผู้ฉัน / My Profile</h2>
 

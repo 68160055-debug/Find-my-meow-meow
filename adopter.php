@@ -6,10 +6,6 @@ require_once 'auth.php';
 require_once 'config/db.php';
 require_login();
 
-<main class="dash-main">
-    <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-    <?php include 'config/search.php'; ?>
-
 $user_id = $_SESSION['user_id'] ?? 0;
 
 // ดึงข้อมูลผู้ใช้งานปัจจุบัน
@@ -84,9 +80,12 @@ $month_names_th = [
     </aside>
 
     <main class="dash-main">
+         <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
+        <?php include 'config/search.php'; ?>
         <div class="chat-container">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
+                  
                     <h3 style="color: #d81b60; margin: 0;">💬 แชตติดต่อผู้ขอรับเลี้ยง</h3>
                     <small style="color: #888;">คู่สนทนา: คุณสมชาย (ผู้ขอรับเลี้ยงน้องส้ม)</small>
                 </div>
