@@ -315,60 +315,61 @@ $discount_percent = $cat['normal_price'] > 0 ? round(($discount_amount / $cat['n
         </div>
     </main>
 
-    <aside class="dash-right">
+    <!-- แถบปฏิทินด้านขวา -->
+   <aside class="dash-right">
         <div class="widget-box">
             <?php
-                $prev_month = $month - 1; $prev_year = $year;
-                if ($prev_month < 1) { $prev_month = 12; $prev_year--; }
-                $next_month = $month + 1; $next_year = $year;
-                if ($next_month > 12) { $next_month = 1; $next_year++; }
+            $month_name = $L['months'][$month];
+            $display_year = ($current_lang === 'en') ? $year : ($year + 543);
             ?>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 14px; color: #d81b60;">
-                <a href="?id=<?= $id ?>&month=<?= $prev_month ?>&year=<?= $prev_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">‹</a>
-                <span><?= $month_names_th[$month] ?> <?= $year + 543 ?></span>
-                <a href="?id=<?= $id ?>&month=<?= $next_month ?>&year=<?= $next_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">›</a>
-            </div>
+            <h4 style="margin: 0 0 10px 0; color: #d81b60;">📅 <?= $month_name ?> <?= $display_year ?></h4>
             <table class="calendar-table">
-                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
+                <tr>
+                    <?php foreach ($L['days'] as $day_name): ?>
+                        <th><?= $day_name ?></th>
+                    <?php endforeach; ?>
+                </tr>
                 <tr>
                 <?php
-                $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
+                $current_day = 1;
+                $today_d = (int)date('j');
+                $today_m = (int)date('n');
+                $today_y = (int)date('Y');
                 for ($i = 0; $i < 42; $i++) {
                     if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
                         $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
-                        $is_future = ($year > $today_y) || ($year == $today_y && $month > $today_m) || ($year == $today_y && $month == $today_m && $current_day > $today_d);
                         if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
-                        elseif ($is_future) echo "<td><span class='cal-future'>{$current_day}</span></td>";
-                        else echo "<td><span class='cal-past'>{$current_day}</span></td>";
+                        else echo "<td style='color:#555;'>{$current_day}</td>";
                         $current_day++;
-                    } else { echo "<td></td>"; }
+                    } else {
+                        echo "<td></td>";
+                    }
                     if ($i % 7 == 6) echo "</tr><tr>";
                 }
                 ?>
                 </tr>
             </table>
         </div>
-        <div class="widget-box" style="text-align: left;">
-            <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
-            <ul class="world-time-list">
-                <li class="world-time-item"><span>🇹🇭 ไทย (UTC+7)</span> <strong id="time-th">--:--</strong></li>
-                <li class="world-time-item"><span>🇯🇵 ญี่ปุ่น (UTC+9)</span> <strong id="time-jp">--:--</strong></li>
-                <li class="world-time-item"><span>🇺🇸 สหรัฐฯ (UTC-4)</span> <strong id="time-us">--:--</strong></li>
-                <li class="world-time-item"><span>🇬🇧 สหราชอาณาจักร</span> <strong id="time-uk">--:--</strong></li>
-            </ul>
-        </div>
     </aside>
 </div>
-
-<script>
-    function updateWorldTimes() {
-        const now = new Date();
-        document.getElementById('time-th').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-jp').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
-    }
-    setInterval(updateWorldTimes, 1000); updateWorldTimes();
-</script>
+</body>
+</html>
+        
+<?php
+// คำนวณเวลาปัจจุบันด้วย Pure PHP (ไม่ใช้ JavaScript)
+$tz_th = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('H:i');
+$tz_jp = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('H:i');
+$tz_us = (new DateTime('now', new DateTimeZone('America/New_York')))->format('H:i');
+$tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i');
+?>
+<div class="widget-box" style="text-align: left;">
+    <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
+    <ul class="world-time-list">
+        <li class="world-time-item"><span>TH ไทย (UTC+7)</span> <strong><?= $tz_th ?></strong></li>
+        <li class="world-time-item"><span>JP ญี่ปุ่น (UTC+9)</span> <strong><?= $tz_jp ?></strong></li>
+        <li class="world-time-item"><span>US สหรัฐฯ (UTC-4/5)</span> <strong><?= $tz_us ?></strong></li>
+        <li class="world-time-item"><span>GB สหราชอาณาจักร</span> <strong><?= $tz_uk ?></strong></li>
+    </ul>
+</div>
 </body>
 </html>

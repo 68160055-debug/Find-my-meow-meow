@@ -1,5 +1,5 @@
 <?php
-// config/search.php (แถบค้นหาสำหรับทุกหน้า รองรับภาษา TH/EN)
+// ตำแหน่งไฟล์: login/config/search.php
 $search_query = isset($_GET['q']) ? htmlspecialchars(trim($_GET['q']), ENT_QUOTES, 'UTF-8') : '';
 $current_avatar = !empty($current_user['avatar']) ? $current_user['avatar'] : (!empty($_SESSION['avatar']) ? $_SESSION['avatar'] : 'student.jpg');
 $default_name = $L['default_user'] ?? 'ผู้ใช้งาน';
@@ -9,7 +9,6 @@ $ph_text     = $L['search_ph'] ?? 'ค้นหาชื่อคน, ชื่�
 $btn_text    = $L['search_btn'] ?? 'ค้นหา';
 $notif_title = $L['notif_title'] ?? 'การแจ้งเตือน';
 ?>
-<!-- Top Search Bar Header Component -->
 <header class="top-dash-header" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 25px; background: #ffffff; border-radius: 20px; border: 1px solid #ffccd5; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(255, 117, 140, 0.05);">
     <form action="search_results.php" method="GET" style="flex: 1; max-width: 550px; position: relative; margin: 0;">
         <span style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 16px; color: #d81b60;">🔍</span>

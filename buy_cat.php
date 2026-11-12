@@ -4,10 +4,14 @@ error_reporting(E_ALL);
 
 require_once 'auth.php';
 require_once 'config/db.php';
-require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
 require_login();
 
 $user_id = $_SESSION['user_id'];
+$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
+$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+$first_day_of_week = date('w', strtotime("$year-$month-01"));
+$month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
 
 // รายการแมวแยกตามสายพันธุ์และระบุไฟล์รูปภาพ
 $cat_list = [
@@ -145,8 +149,8 @@ $cat_list = [
             <?php endforeach; ?>
         </div>
     </main>
-
-    <aside class="dash-right">
+<!-- แถบปฏิทินด้านขวา -->
+   <aside class="dash-right">
         <div class="widget-box">
             <?php
             $month_name = $L['months'][$month];
@@ -154,52 +158,52 @@ $cat_list = [
             ?>
             <h4 style="margin: 0 0 10px 0; color: #d81b60;">📅 <?= $month_name ?> <?= $display_year ?></h4>
             <table class="calendar-table">
-        <tr>
-            <?php foreach ($L['days'] as $day_name): ?>
-            <th><?= $day_name ?></th>
-            <?php endforeach; ?>
-        </tr>
-    <tr>
-    <?php
-    $current_day = 1;
-    $today_d = (int)date('j');
-    $today_m = (int)date('n');
-    $today_y = (int)date('Y');
-    for ($i = 0; $i < 42; $i++) {
-        if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
-            $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
-            if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
-            else echo "<td style='color:#555;'>{$current_day}</td>";
-            $current_day++;
-        } else {
-            echo "<td></td>";
-        }
-        if ($i % 7 == 6) echo "</tr><tr>";
-    }
-    ?>
-    </tr>
-</table>
-        <div class="widget-box" style="text-align: left;">
-            <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
-            <ul class="world-time-list">
-                <li class="world-time-item"><span>🇹🇭 ไทย (UTC+7)</span> <strong id="time-th">--:--</strong></li>
-                <li class="world-time-item"><span>🇯🇵 ญี่ปุ่น (UTC+9)</span> <strong id="time-jp">--:--</strong></li>
-                <li class="world-time-item"><span>🇺🇸 สหรัฐฯ (UTC-4)</span> <strong id="time-us">--:--</strong></li>
-                <li class="world-time-item"><span>🇬🇧 สหราชอาณาจักร</span> <strong id="time-uk">--:--</strong></li>
-            </ul>
+                <tr>
+                    <?php foreach ($L['days'] as $day_name): ?>
+                        <th><?= $day_name ?></th>
+                    <?php endforeach; ?>
+                </tr>
+                <tr>
+                <?php
+                $current_day = 1;
+                $today_d = (int)date('j');
+                $today_m = (int)date('n');
+                $today_y = (int)date('Y');
+                for ($i = 0; $i < 42; $i++) {
+                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
+                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
+                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
+                        else echo "<td style='color:#555;'>{$current_day}</td>";
+                        $current_day++;
+                    } else {
+                        echo "<td></td>";
+                    }
+                    if ($i % 7 == 6) echo "</tr><tr>";
+                }
+                ?>
+                </tr>
+            </table>
         </div>
     </aside>
 </div>
+</body>
+</html>
 
-<script>
-    function updateWorldTimes() {
-        const now = new Date();
-        document.getElementById('time-th').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-jp').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
-    }
-    setInterval(updateWorldTimes, 1000); updateWorldTimes();
-</script>
+<?php
+// คำนวณเวลาปัจจุบันด้วย Pure PHP (ไม่ใช้ JavaScript)
+$tz_th = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('H:i');
+$tz_jp = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('H:i');
+$tz_us = (new DateTime('now', new DateTimeZone('America/New_York')))->format('H:i');
+$tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i');
+?>
+<div class="widget-box" style="text-align: left;">
+    <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
+    <ul class="world-time-list">
+        <li class="world-time-item"><span>TH ไทย (UTC+7)</span> <strong><?= $tz_th ?></strong></li>
+        <li class="world-time-item"><span>JP ญี่ปุ่น (UTC+9)</span> <strong><?= $tz_jp ?></strong></li>
+        <li class="world-time-item"><span>US สหรัฐฯ (UTC-4/5)</span> <strong><?= $tz_us ?></strong></li>
+        <li class="world-time-item"><span>GB สหราชอาณาจักร</span> <strong><?= $tz_uk ?></strong></li>
+    </ul>
+</div>
 </body>
 </html>
