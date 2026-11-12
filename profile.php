@@ -15,8 +15,15 @@ $is_en = (($_SESSION['site_lang'] ?? 'th') === 'en');
 $message = '';
 $error = '';
 
+// กรณีอัปโหลดไฟล์ใหญ่เกินขนาดที่เซิร์ฟเวอร์กำหนด (เช่น ไฟล์วิดีโอ .mp4)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0) {
+    $error = $is_en
+        ? '❌ File is too large or invalid! Only .jpg or .jpeg image files are allowed.'
+        : '❌ ไฟล์มีขนาดใหญ่เกินไปหรือประเภทไฟล์ไม่ถูกต้อง! อนุญาตเฉพาะรูปภาพนามสกุล .jpg หรือ .jpeg เท่านั้น';
+}
+
 // จัดการการบันทึกข้อมูลเมื่อผู้ใช้กดอัปเดตฟอร์มโปรไฟล์ หรืออัปโหลดรูปภาพ
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
     check_auth_token();
 
     // 1. อัปเดตข้อมูลส่วนตัว
@@ -43,34 +50,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // 2. อัปเดตรูปภาพโปรไฟล์ (เฉพาะไฟล์ .jpg / .jpeg เท่านั้น)
-    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-        $file_tmp = $_FILES['avatar']['tmp_name'];
-        $original_name = basename($_FILES['avatar']['name']);
-        $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+    // 2. อัปเดตรูปภาพโปรไฟล์ (ตรวจสอบเฉพาะไฟล์รูปภาพ .jpg / .jpeg เท่านั้น)
+    if (isset($_POST['upload_avatar']) || (isset($_FILES['avatar']) && $_FILES['avatar']['error'] !== UPLOAD_ERR_NO_FILE)) {
+        if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] === UPLOAD_ERR_NO_FILE) {
+            $error = $is_en
+                ? '⚠️ Please select a .jpg or .jpeg image file before uploading.'
+                : '⚠️ กรุณาเลือกไฟล์รูปภาพนามสกุล .jpg หรือ .jpeg ก่อนกดบันทึกรูปภาพ';
+        } elseif ($_FILES['avatar']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['avatar']['error'] === UPLOAD_ERR_FORM_SIZE) {
+            $error = $is_en
+                ? '❌ File is too large! Only .jpg or .jpeg image files are allowed.'
+                : '❌ ไฟล์มีขนาดใหญ่เกินกำหนด! อนุญาตเฉพาะรูปภาพนามสกุล .jpg หรือ .jpeg เท่านั้น';
+        } elseif ($_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
+            $file_tmp = $_FILES['avatar']['tmp_name'];
+            $original_name = basename($_FILES['avatar']['name']);
+            $ext = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+            $img_info = @getimagesize($file_tmp);
+            $is_valid_jpeg = ($ext === 'jpg' || $ext === 'jpeg') && ($img_info !== false) && ($img_info[2] === IMAGETYPE_JPEG);
 
-        if ($ext === 'jpg' || $ext === 'jpeg') {
-            $file_name = time() . '_' . preg_replace("/[^a-zA-Z0-9\._-]/", "", $original_name);
-            $upload_dir = __DIR__ . '/assets/images/';
+            if ($is_valid_jpeg) {
+                $file_name = time() . '_' . preg_replace("/[^a-zA-Z0-9\._-]/", "", $original_name);
+                $upload_dir = __DIR__ . '/assets/images/';
 
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0755, true);
-            }
+                if (!is_dir($upload_dir)) {
+                    mkdir($upload_dir, 0755, true);
+                }
 
-            if (move_uploaded_file($file_tmp, $upload_dir . $file_name)) {
-                $stmt = $conn->prepare("UPDATE users SET avatar = ? WHERE id = ?");
-                $stmt->bind_param("si", $file_name, $user_id);
-                $stmt->execute();
-                $stmt->close();
-                $_SESSION['avatar'] = $file_name;
+                if (move_uploaded_file($file_tmp, $upload_dir . $file_name)) {
+                    $stmt = $conn->prepare("UPDATE users SET avatar = ? WHERE id = ?");
+                    $stmt->bind_param("si", $file_name, $user_id);
+                    $stmt->execute();
+                    $stmt->close();
+                    $_SESSION['avatar'] = $file_name;
 
-                header("Location: profile.php?success=avatar");
-                exit();
+                    header("Location: profile.php?success=avatar");
+                    exit();
+                } else {
+                    $error = $is_en ? 'Unable to upload image file.' : 'ไม่สามารถอัปโหลดไฟล์รูปภาพได้';
+                }
             } else {
-                $error = $is_en ? 'Unable to upload image file.' : 'ไม่สามารถอัปโหลดไฟล์รูปภาพได้';
+                $error = $is_en
+                    ? '❌ Invalid file type! Only .jpg or .jpeg image files are allowed.'
+                    : '❌ ไม่อนุญาตไฟล์นี้! อนุญาตเฉพาะรูปภาพที่มีนามสกุล .jpg หรือ .jpeg เท่านั้น';
             }
         } else {
-            $error = $is_en ? 'Only .jpg or .jpeg image files are allowed!' : 'อนุญาตให้อัปโหลดเฉพาะไฟล์รูปภาพนามสกุล .jpg หรือ .jpeg เท่านั้น!';
+            $error = $is_en
+                ? '❌ Upload failed! Please select a .jpg or .jpeg image file.'
+                : '❌ เกิดข้อผิดพลาดในการอัปโหลด กรุณาเลือกเฉพาะไฟล์รูปภาพ .jpg หรือ .jpeg เท่านั้น';
         }
     }
 }
@@ -120,7 +145,11 @@ $tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i')
         .profile-header-flex { display: flex; align-items: center; gap: 25px; margin-bottom: 25px; flex-wrap: wrap; }
         .avatar-box { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .profile-avatar-img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 4px solid #ffb6c1; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; }
-        .btn-upload-avatar { background: #ff758c; color: white; border: none; padding: 5px 14px; border-radius: 12px; font-size: 12px; cursor: pointer; font-family: 'Kanit', sans-serif; }
+        .btn-upload-avatar { background: #ff758c; color: white; border: none; padding: 6px 16px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif; }
+        .btn-upload-avatar:hover { background: #d81b60; }
+        .upload-hint { font-size: 11.5px; color: #c62828; background: #fff5f5; border: 1px dashed #ef9a9a; padding: 4px 10px; border-radius: 8px; text-align: center; }
+        .alert-success { color: #1b5e20; background: #e8f5e9; border: 1px solid #a5d6a7; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; margin-bottom: 15px; }
+        .alert-error { color: #b71c1c; background: #ffebee; border: 1px solid #ef9a9a; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 500; margin-bottom: 15px; }
         .stats-badges { display: flex; gap: 15px; }
         .stat-card { background: #fff0f3; padding: 12px 20px; border-radius: 14px; text-align: center; border: 1px solid #ffccd5; min-width: 100px; }
         .stat-card strong { display: block; font-size: 18px; color: #d81b60; }
@@ -173,26 +202,29 @@ $tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i')
         <div class="profile-card">
             <h2 style="color: #d81b60; margin-top: 0; margin-bottom: 20px;"><?= $is_en ? '🐾 My Profile' : '🐾 โปรไฟล์ของฉัน / My Profile' ?></h2>
 
-            <?php if (isset($_GET['success'])): ?>
-                <p style="color: green; font-size: 13px; margin-bottom: 10px;"><?= $is_en ? 'Profile photo updated successfully!' : 'อัปเดตรูปโปรไฟล์สำเร็จ!' ?></p>
+            <?php if (isset($_GET['success']) && $_GET['success'] === 'avatar'): ?>
+                <div class="alert-success">✅ <?= $is_en ? 'Profile photo updated successfully!' : 'อัปเดตรูปโปรไฟล์สำเร็จ!' ?></div>
             <?php endif; ?>
             <?php if ($message): ?>
-                <p style="color: green; font-size: 13px; margin-bottom: 10px;"><?= auth_escape($message) ?></p>
+                <div class="alert-success">✅ <?= auth_escape($message) ?></div>
             <?php endif; ?>
             <?php if ($error): ?>
-                <p style="color: red; font-size: 13px; margin-bottom: 10px;"><?= auth_escape($error) ?></p>
+                <div class="alert-error"><?= auth_escape($error) ?></div>
             <?php endif; ?>
 
             <form method="post" enctype="multipart/form-data">
                 <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
 
                 <div class="profile-header-flex">
-                    <!-- อัปโหลดรูปภาพแบบ Pure HTML (ไม่ใช้ JavaScript onclick/onchange) -->
+                    <!-- อัปโหลดรูปภาพแบบ Pure HTML + แจ้งเตือนเงื่อนไขนามสกุลไฟล์ -->
                     <div class="avatar-box">
-                        <label for="avatarInput" title="<?= $is_en ? 'Click to select photo (.jpg only)' : 'คลิกเพื่อเลือกรูปภาพ (.jpg เท่านั้น)' ?>">
+                        <label for="avatarInput" title="<?= $is_en ? 'Click to select photo (.jpg or .jpeg only)' : 'คลิกเพื่อเลือกรูปภาพ (.jpg หรือ .jpeg เท่านั้น)' ?>">
                             <img src="<?= htmlspecialchars($avatar_path, ENT_QUOTES, 'UTF-8') ?>" class="profile-avatar-img" alt="Avatar">
                         </label>
-                        <input type="file" id="avatarInput" name="avatar" accept=".jpg, .jpeg" style="font-size: 11px; max-width: 170px;">
+                        <input type="file" id="avatarInput" name="avatar" accept=".jpg,.jpeg,image/jpeg" style="font-size: 11px; max-width: 185px;">
+                        <div class="upload-hint">
+                            ⚠️ <?= $is_en ? 'Allowed: .jpg or .jpeg images only' : 'อนุญาตเฉพาะรูปภาพนามสกุล .jpg หรือ .jpeg เท่านั้น' ?>
+                        </div>
                         <button type="submit" name="upload_avatar" class="btn-upload-avatar"><?= $is_en ? 'Upload Photo' : 'บันทึกรูปภาพ' ?></button>
                     </div>
 

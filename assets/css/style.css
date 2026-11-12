@@ -202,3 +202,189 @@ body {
     text-decoration: none;
     font-weight: 600;
 }
+
+/* =========================================================
+   Responsive Design ฉบับสมบูรณ์ (Desktop / iPad / Mobile / Foldable)
+   ========================================================= */
+
+/* 0. ป้องกันเนื้อหาล้นจอในทุกอุปกรณ์ */
+html, body {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
+img, video, iframe {
+    max-width: 100%;
+    height: auto;
+}
+
+.feed-card p,
+.result-card,
+.email-pill,
+.widget-username {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.calendar-table {
+    display: block;
+    overflow-x: auto;
+}
+
+/* 1. จอคอมพิวเตอร์ขนาดใหญ่ (1441px ขึ้นไป) — คุมความกว้างไม่ให้ยืดเกินไป */
+@media (min-width: 1441px) {
+    .dashboard-layout {
+        max-width: 1440px;
+        margin: 0 auto;
+        box-shadow: 0 0 30px rgba(255, 117, 140, 0.08);
+    }
+}
+
+/* 2. iPad / Tablet / มือถือจอพับเมื่อกางออกแนวนอน (769px – 1024px) */
+@media (max-width: 1024px) {
+    .dashboard-layout {
+        grid-template-columns: 200px 1fr !important;
+    }
+
+    /* ย้ายแถบขวา (ปฏิทิน / เวลาโลก / สถิติ) ลงมาด้านล่างเต็มความกว้าง */
+    .dash-right,
+    .right-sidebar {
+        grid-column: 1 / -1 !important;
+        position: static !important;
+        height: auto !important;
+        border-left: none !important;
+        border-top: 1px solid #ffccd5 !important;
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
+        gap: 15px !important;
+        padding: 20px !important;
+    }
+
+    .catalog-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* 3. มือถือจอใหญ่ & มือถือทั่วไป (ไม่เกิน 768px) — ปรับเป็น 1 คอลัมน์ */
+@media (max-width: 768px) {
+    .dashboard-layout {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* เปลี่ยนเมนูซ้ายเป็นแถบเมนูด้านบน พับบรรทัดอัตโนมัติ */
+    .dash-sidebar {
+        position: static !important;
+        height: auto !important;
+        border-right: none !important;
+        border-bottom: 1px solid #ffccd5 !important;
+        padding: 14px !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .dash-brand {
+        width: 100% !important;
+        margin-bottom: 6px !important;
+        font-size: 18px !important;
+    }
+
+    .dash-nav-item {
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+        flex: 1 1 calc(50% - 8px) !important;
+        justify-content: center !important;
+        text-align: center !important;
+    }
+
+    .dash-main {
+        padding: 15px !important;
+        overflow-y: visible !important;
+    }
+
+    /* แถบค้นหาด้านบน, กล่องโพสต์, และตัวกรอง */
+    .top-dash-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+        padding: 12px 15px !important;
+    }
+
+    .top-dash-header form {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .post-input-row,
+    .filter-bar {
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+    }
+
+    .post-input-row input,
+    .btn-post,
+    .filter-bar input,
+    .filter-bar select,
+    .filter-bar button {
+        width: 100% !important;
+    }
+
+    /* ฟอร์มและรายการแมวเป็น 1 คอลัมน์ */
+    .form-grid,
+    .catalog-grid,
+    .price-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    .form-group.full {
+        grid-column: span 1 !important;
+    }
+
+    .post-actions {
+        flex-wrap: wrap !important;
+    }
+
+    .dash-right,
+    .right-sidebar {
+        grid-template-columns: 1fr !important;
+        padding: 15px !important;
+    }
+}
+
+/* 4. มือถือจอเล็กมาก และจอนอกของมือถือพับ (320px – 480px) */
+@media (max-width: 480px) {
+    .dash-main {
+        padding: 10px !important;
+    }
+
+    .profile-card,
+    .contact-card,
+    .settings-card,
+    .feed-card {
+        padding: 16px !important;
+        border-radius: 16px !important;
+    }
+
+    .dash-nav-item {
+        flex: 1 1 100% !important;
+    }
+
+    .stats-badges {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .stat-card {
+        flex: 1;
+        min-width: 0;
+    }
+}
+
+/* 5. รองรับมือถือพับกางแบบ 2 หน้าจอ (Dual-screen / Fold Segment) */
+@media (horizontal-viewport-segments: 2) {
+    .dashboard-layout {
+        grid-template-columns: env(viewport-segment-width 0 0) env(viewport-segment-width 1 0) !important;
+        gap: calc(env(viewport-segment-left 1 0) - env(viewport-segment-right 0 0));
+    }
+}
