@@ -1,13 +1,20 @@
 /* พื้นหลังเว็บโทนพาสเทลชมพูอ่อน */
-body {
+html, body {
     background: linear-gradient(135deg, #fff0f3 0%, #f3e5f5 100%);
     font-family: 'Kanit', sans-serif;
     margin: 0;
     color: #444;
     min-height: 100vh;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 
-/* Navbar ด้านบน */
+img, video, iframe {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Navbar ด้านบน (หน้า Login / Register) */
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -15,6 +22,8 @@ body {
     padding: 15px 40px;
     background: white;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+    gap: 10px;
 }
 .logo {
     font-weight: bold;
@@ -25,6 +34,7 @@ body {
     display: flex;
     gap: 15px;
     align-items: center;
+    flex-wrap: wrap;
 }
 .nav-links a {
     text-decoration: none;
@@ -44,7 +54,7 @@ body {
     border-radius: 20px;
 }
 
-/* เลย์เอาต์หลัก ซ้าย-ขวา */
+/* เลย์เอาต์หลัก ซ้าย-ขวา (หน้า Login / Register) */
 .login-wrapper {
     display: flex;
     justify-content: center;
@@ -83,6 +93,7 @@ body {
     box-shadow: 0 10px 30px rgba(0,0,0,0.08);
     width: 100%;
     max-width: 420px;
+    box-sizing: border-box;
 }
 .card-header {
     display: flex;
@@ -207,15 +218,9 @@ body {
    Responsive Design ฉบับสมบูรณ์ (Desktop / iPad / Mobile / Foldable)
    ========================================================= */
 
-/* 0. ป้องกันเนื้อหาล้นจอในทุกอุปกรณ์ */
-html, body {
-    overflow-x: hidden;
-    max-width: 100%;
-}
-
-img, video, iframe {
-    max-width: 100%;
-    height: auto;
+/* ป้องกันคอลัมน์ใน Grid ขยายเกินขอบหน้าจอ */
+.dashboard-layout > * {
+    min-width: 0;
 }
 
 .feed-card p,
@@ -227,11 +232,11 @@ img, video, iframe {
 }
 
 .calendar-table {
-    display: block;
-    overflow-x: auto;
+    width: 100%;
+    table-layout: fixed;
 }
 
-/* 1. จอคอมพิวเตอร์ขนาดใหญ่ (1441px ขึ้นไป) — คุมความกว้างไม่ให้ยืดเกินไป */
+/* 1. จอคอมพิวเตอร์ขนาดใหญ่ (1441px ขึ้นไป) */
 @media (min-width: 1441px) {
     .dashboard-layout {
         max-width: 1440px;
@@ -240,13 +245,17 @@ img, video, iframe {
     }
 }
 
-/* 2. iPad / Tablet / มือถือจอพับเมื่อกางออกแนวนอน (769px – 1024px) */
+/* 2. iPad / Tablet (769px – 1024px) */
 @media (max-width: 1024px) {
+    .login-wrapper {
+        gap: 30px;
+        flex-wrap: wrap;
+    }
+
     .dashboard-layout {
         grid-template-columns: 200px 1fr !important;
     }
 
-    /* ย้ายแถบขวา (ปฏิทิน / เวลาโลก / สถิติ) ลงมาด้านล่างเต็มความกว้าง */
     .dash-right,
     .right-sidebar {
         grid-column: 1 / -1 !important;
@@ -265,13 +274,27 @@ img, video, iframe {
     }
 }
 
-/* 3. มือถือจอใหญ่ & มือถือทั่วไป (ไม่เกิน 768px) — ปรับเป็น 1 คอลัมน์ */
+/* 3. มือถือทั่วไป (ไม่เกิน 768px) — ปรับเป็น 1 คอลัมน์เต็มจอ */
 @media (max-width: 768px) {
+    .navbar {
+        padding: 12px 16px;
+        justify-content: center;
+    }
+
+    .login-wrapper {
+        flex-direction: column;
+        padding: 15px;
+        gap: 20px;
+    }
+
+    .login-card {
+        padding: 25px 20px;
+    }
+
     .dashboard-layout {
         grid-template-columns: 1fr !important;
     }
 
-    /* เปลี่ยนเมนูซ้ายเป็นแถบเมนูด้านบน พับบรรทัดอัตโนมัติ */
     .dash-sidebar {
         position: static !important;
         height: auto !important;
@@ -291,7 +314,7 @@ img, video, iframe {
     }
 
     .dash-nav-item {
-        padding: 8px 12px !important;
+        padding: 8px 10px !important;
         font-size: 13px !important;
         flex: 1 1 calc(50% - 8px) !important;
         justify-content: center !important;
@@ -303,7 +326,6 @@ img, video, iframe {
         overflow-y: visible !important;
     }
 
-    /* แถบค้นหาด้านบน, กล่องโพสต์, และตัวกรอง */
     .top-dash-header {
         flex-direction: column !important;
         align-items: stretch !important;
@@ -330,7 +352,6 @@ img, video, iframe {
         width: 100% !important;
     }
 
-    /* ฟอร์มและรายการแมวเป็น 1 คอลัมน์ */
     .form-grid,
     .catalog-grid,
     .price-row {

@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
         } elseif ($_FILES['avatar']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['avatar']['error'] === UPLOAD_ERR_FORM_SIZE) {
             $error = $is_en
                 ? '❌ File is too large! Only .jpg or .jpeg image files are allowed.'
-                : '❌ ไฟล์มีขนาดใหญ่เกินกำหนด! อนุญาตเฉพาะรูปภาพนามสกุล .jpg หรือ .jpeg เท่านั้น';
+                : '❌ ไฟล์มีขนาดใหญ่เกินไป! อนุญาตเฉพาะรูปภาพนามสกุล .jpg หรือ .jpeg เท่านั้น';
         } elseif ($_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
             $file_tmp = $_FILES['avatar']['tmp_name'];
             $original_name = basename($_FILES['avatar']['name']);
@@ -130,7 +130,7 @@ $tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i')
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $is_en ? 'My Profile - Find my meow meow 💖' : 'โปรไฟล์ของฉัน - Find my meow meow 💖' ?></title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }

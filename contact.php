@@ -45,7 +45,7 @@ $tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i')
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $is_en ? 'Contact Us / Admin - Find my meow meow 💖' : 'ติดต่อผู้ประกาศ/แอดมิน - Find my meow meow 💖' ?></title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
