@@ -1,6 +1,7 @@
 <?php
 require 'auth.php';
 require 'config/db.php';
+require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
 require_login();
 ?>
 <main class="dash-main">

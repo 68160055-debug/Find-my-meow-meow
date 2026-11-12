@@ -4,6 +4,7 @@ error_reporting(E_ALL);
 
 require_once 'auth.php';
 require_once 'config/db.php';
+require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
 require_login();
 
 

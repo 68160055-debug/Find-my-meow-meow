@@ -4,6 +4,7 @@ error_reporting(E_ALL);
 
 require_once 'auth.php';
 require_once 'config/db.php';
+require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
 require_login();
 
 $user_id = $_SESSION['user_id'];
@@ -365,18 +366,17 @@ $month_names_th = [
 <div class="dashboard-layout">
     <!-- แถบซ้ายมือ (Sidebar) -->
     <aside class="dash-sidebar">
-        <div class="dash-brand">🐾 Find my meow meow</div>
-        <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
-        <a href="profile.php" class="dash-nav-item active">👤 ประวัติผู้ใช้งาน</a>
-        <a href="contact.php" class="dash-nav-item">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
-        <a href="buy_cat.php" class="dash-nav-item">🛒 ซื้อแมว</a>
-        <a href="adopter.php" class="dash-nav-item">💬 ติดต่อผู้ขอรับเลี้ยง</a>
-        <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
-        
-        <div style="margin-top: auto;">
-            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">🚪 ออกจากระบบ</a>
-        </div>
-    </aside>
+    <div class="dash-brand">🐾 Find my meow meow</div>
+    <a href="index.php" class="dash-nav-item active"><?= $L['nav_home'] ?></a>
+    <a href="profile.php" class="dash-nav-item"><?= $L['nav_profile'] ?></a>
+    <a href="contact.php" class="dash-nav-item"><?= $L['nav_contact'] ?></a>
+    <a href="buy_cat.php" class="dash-nav-item"><?= $L['nav_buy'] ?></a>
+    <a href="adopter.php" class="dash-nav-item"><?= $L['nav_chat'] ?></a>
+    <a href="settings.php" class="dash-nav-item"><?= $L['nav_settings'] ?></a>
+    <div style="margin-top: auto;">
+        <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;"><?= $L['nav_logout'] ?></a>
+    </div>
+</aside>
 
     <!-- พื้นที่ตรงกลาง (Main Content) -->
     <main class="dash-main">

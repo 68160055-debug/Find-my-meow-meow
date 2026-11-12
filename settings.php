@@ -4,6 +4,7 @@ error_reporting(E_ALL);
 
 require_once 'auth.php';
 require_once 'config/db.php';
+require_once 'config/lang.php';
 require_login();
 
 $user_id = $_SESSION['user_id'];
@@ -82,7 +83,6 @@ $txt = [
         'btn_logout' => '🚪 Logout'
     ]
 ];
-$L = $txt[$current_lang];
 
 $stmt = $conn->prepare("SELECT full_name, email, avatar FROM users WHERE id = ? LIMIT 1");
 $stmt->bind_param("i", $user_id);
@@ -90,14 +90,7 @@ $stmt->execute();
 $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
-$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
-$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-$first_day_of_week = date('w', strtotime("$year-$month-01"));
-$month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
-$month_names_en = [1=>'January', 2=>'February', 3=>'March', 4=>'April', 5=>'May', 6=>'June', 7=>'July', 8=>'August', 9=>'September', 10=>'October', 11=>'November', 12=>'December'];
-$month_name = ($current_lang === 'en') ? $month_names_en[$month] : $month_names_th[$month];
-?>
+
 <!doctype html>
 <html lang="<?= $current_lang ?>">
 <head>
@@ -210,28 +203,34 @@ $month_name = ($current_lang === 'en') ? $month_names_en[$month] : $month_names_
     </main>
 
     <!-- แถบปฏิทินด้านขวา -->
-    <aside class="dash-right">
-        <div class="widget-box">
-            <h4 style="margin: 0 0 10px 0; color: #d81b60;">📅 <?= $month_name ?> <?= ($current_lang === 'en') ? $year : ($year + 543) ?></h4>
-            <table class="calendar-table">
-                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
-                <tr>
-                <?php
-                $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
-                for ($i = 0; $i < 42; $i++) {
-                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
-                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
-                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
-                        else echo "<td style='color:#555;'>{$current_day}</td>";
-                        $current_day++;
-                    } else { echo "<td></td>"; }
-                    if ($i % 7 == 6) echo "</tr><tr>";
-                }
-                ?>
-                </tr>
-            </table>
-        </div>
-    </aside>
-</div>
-</body>
-</html>
+<?php
+$month_name = $L['months'][$month];
+$display_year = ($current_lang === 'en') ? $year : ($year + 543);
+?>
+<h4 style="margin: 0 0 10px 0; color: #d81b60;">📅 <?= $month_name ?> <?= $display_year ?></h4>
+<table class="calendar-table">
+    <tr>
+        <?php foreach ($L['days'] as $day_name): ?>
+            <th><?= $day_name ?></th>
+        <?php endforeach; ?>
+    </tr>
+    <tr>
+    <?php
+    $current_day = 1;
+    $today_d = (int)date('j');
+    $today_m = (int)date('n');
+    $today_y = (int)date('Y');
+    for ($i = 0; $i < 42; $i++) {
+        if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
+            $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
+            if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
+            else echo "<td style='color:#555;'>{$current_day}</td>";
+            $current_day++;
+        } else {
+            echo "<td></td>";
+        }
+        if ($i % 7 == 6) echo "</tr><tr>";
+    }
+    ?>
+    </tr>
+</table>
