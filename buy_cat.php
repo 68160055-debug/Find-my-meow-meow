@@ -11,7 +11,6 @@ require_login();
 $user_id = (int)$_SESSION['user_id'];
 $post_err = '';
 
-// ฟังก์ชันแปลงเวลาจริงแบบไทย
 function time_ago_th($datetime_str) {
     $ts = strtotime($datetime_str);
     $diff = time() - $ts;
@@ -20,92 +19,94 @@ function time_ago_th($datetime_str) {
     if ($diff < 86400) return floor($diff / 3600) . ' ชั่วโมงที่ผ่านมา';
     if (date('Y-m-d', $ts) === date('Y-m-d', strtotime('-1 day'))) return 'เมื่อวาน';
     $th_months = [1=>'ม.ค.',2=>'ก.พ.',3=>'มี.ค.',4=>'เม.ย.',5=>'พ.ค.',6=>'มิ.ย.',7=>'ก.ค.',8=>'ส.ค.',9=>'ก.ย.',10=>'ต.ค.',11=>'พ.ย.',12=>'ธ.ค.'];
-    $d = (int)date('j', $ts);
-    $m = $th_months[(int)date('n', $ts)];
-    $y = ((int)date('Y', $ts) + 543) % 100;
-    return "{$d} {$m} {$y}";
+    return (int)date('j', $ts) . ' ' . $th_months[(int)date('n', $ts)] . ' ' . (((int)date('Y', $ts) + 543) % 100);
 }
 
-function resolve_av($file) {
+function resolve_av_url($file) {
     $b = basename((string)$file);
-    return ($b !== '' && is_file(__DIR__ . '/assets/images/' . $b)) ? $b : 'student.jpg';
+    $full = __DIR__ . '/assets/images/' . $b;
+    if ($b !== '' && is_file($full)) {
+        return 'assets/images/' . rawurlencode($b) . '?v=' . @filemtime($full);
+    }
+    return 'assets/images/student.jpg';
 }
 
-// ดักจับกรณีอัปโหลดไฟล์/วิดีโอขนาดใหญ่เกินค่า post_max_size ของเซิร์ฟเวอร์
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && isset($_SERVER['CONTENT_LENGTH']) && (int)$_SERVER['CONTENT_LENGTH'] > 0) {
-    $post_err = '❌ ไฟล์หรือวิดีโอมีขนาดใหญ่เกินกำหนดของเซิร์ฟเวอร์! จำกัดรูปภาพ/เอกสารไม่เกิน 5MB และวิดีโอไม่เกิน 15MB (หากไฟล์ใหญ่แนะนำให้แนบลิงก์ Google Drive)';
+    $post_err = '❌ ไฟล์หรือวิดีโอมีขนาดใหญ่เกินกำหนดของเซิร์ฟเวอร์! จำกัดรูปภาพ/เอกสาร ≤ 5MB และวิดีโอ ≤ 15MB';
 }
 
-// =========================================================
-// จัดการคำสั่ง POST (โพสต์, ลบโพสต์, ถูกใจ 4 แบบ, คอมเมนต์, ติดตาม)
-// =========================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
     check_auth_token();
 
-    // A. สร้างโพสต์ขายแมวสาธารณะ
     if (isset($_POST['create_sale_post'])) {
         $content = trim((string)($_POST['post_content'] ?? ''));
         $drive_link = trim((string)($_POST['drive_link'] ?? ''));
 
         if ($drive_link !== '' && !filter_var($drive_link, FILTER_VALIDATE_URL)) {
-            $post_err = '❌ ลิงก์ Google Drive ไม่ถูกต้อง (ต้องขึ้นต้นด้วย https://)';
+            $post_err = '❌ ลิงก์ Google Drive ไม่ถูกต้อง';
         } elseif ($content === '' && empty($_FILES['post_image']['name']) && empty($_FILES['post_video']['name']) && empty($_FILES['post_doc']['name']) && $drive_link === '') {
             $post_err = '⚠️ กรุณาพิมพ์ข้อความหรือแนบไฟล์/ลิงก์ก่อนโพสต์';
         } else {
             $upload_dir = __DIR__ . '/uploads/posts/';
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            if (!is_dir($upload_dir)) @mkdir($upload_dir, 0755, true);
+            @chmod(__DIR__ . '/uploads/', 0755);
+            @chmod($upload_dir, 0755);
 
             $img_file = null; $vid_file = null; $doc_file = null;
 
-            // 1) รูปภาพ .jpg, .jpeg, .png (จำกัด <= 5MB)
             if (!empty($_FILES['post_image']['name'])) {
                 if ($_FILES['post_image']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['post_image']['error'] === UPLOAD_ERR_FORM_SIZE) {
-                    $post_err = '❌ รูปภาพมีขนาดใหญ่เกินกำหนด (จำกัดไม่เกิน 5MB)';
+                    $post_err = '❌ รูปภาพมีขนาดใหญ่เกินกำหนด (จำกัด ≤ 5MB)';
                 } elseif ($_FILES['post_image']['error'] === UPLOAD_ERR_OK) {
                     $ext = strtolower(pathinfo($_FILES['post_image']['name'], PATHINFO_EXTENSION));
                     $img_check = @getimagesize($_FILES['post_image']['tmp_name']);
                     if (in_array($ext, ['jpg', 'jpeg', 'png'], true) && $img_check !== false && $_FILES['post_image']['size'] <= 5 * 1024 * 1024) {
                         $img_file = time() . '_img_' . preg_replace('/[^a-zA-Z0-9._-]/', '', basename($_FILES['post_image']['name']));
-                        move_uploaded_file($_FILES['post_image']['tmp_name'], $upload_dir . $img_file);
+                        if (move_uploaded_file($_FILES['post_image']['tmp_name'], $upload_dir . $img_file)) {
+                            @chmod($upload_dir . $img_file, 0644);
+                        }
                     } else {
-                        $post_err = '❌ รูปภาพอนุญาตเฉพาะไฟล์ .jpg, .jpeg, .png ขนาดไม่เกิน 5MB เท่านั้น';
+                        $post_err = '❌ รูปภาพอนุญาตเฉพาะ .jpg, .jpeg, .png ขนาดไม่เกิน 5MB';
                     }
                 }
             }
 
-            // 2) วิดีโอ .mp4, .webm (จำกัด <= 15MB)
             if (!$post_err && !empty($_FILES['post_video']['name'])) {
                 if ($_FILES['post_video']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['post_video']['error'] === UPLOAD_ERR_FORM_SIZE) {
-                    $post_err = '❌ วิดีโอมีขนาดใหญ่เกินกำหนด (จำกัดไม่เกิน 15MB หากใหญ่กว่านี้กรุณาใช้ลิงก์ Google Drive)';
+                    $post_err = '❌ วิดีโอมีขนาดใหญ่เกินกำหนด (จำกัด ≤ 15MB)';
                 } elseif ($_FILES['post_video']['error'] === UPLOAD_ERR_OK) {
                     $ext = strtolower(pathinfo($_FILES['post_video']['name'], PATHINFO_EXTENSION));
                     if (in_array($ext, ['mp4', 'webm'], true) && $_FILES['post_video']['size'] <= 15 * 1024 * 1024) {
                         $vid_file = time() . '_vid_' . preg_replace('/[^a-zA-Z0-9._-]/', '', basename($_FILES['post_video']['name']));
-                        move_uploaded_file($_FILES['post_video']['tmp_name'], $upload_dir . $vid_file);
+                        if (move_uploaded_file($_FILES['post_video']['tmp_name'], $upload_dir . $vid_file)) {
+                            @chmod($upload_dir . $vid_file, 0644);
+                        }
                     } else {
-                        $post_err = '❌ วิดีโออนุญาตเฉพาะ .mp4 หรือ .webm ขนาดไม่เกิน 15MB เท่านั้น';
+                        $post_err = '❌ วิดีโออนุญาตเฉพาะ .mp4 หรือ .webm ขนาดไม่เกิน 15MB';
                     }
                 }
             }
 
-            // 3) เอกสาร .pdf, .doc, .docx, .ppt, .pptx (จำกัด <= 5MB)
             if (!$post_err && !empty($_FILES['post_doc']['name'])) {
                 if ($_FILES['post_doc']['error'] === UPLOAD_ERR_INI_SIZE || $_FILES['post_doc']['error'] === UPLOAD_ERR_FORM_SIZE) {
-                    $post_err = '❌ ไฟล์เอกสารมีขนาดใหญ่เกินกำหนด (จำกัดไม่เกิน 5MB)';
+                    $post_err = '❌ เอกสารมีขนาดใหญ่เกินกำหนด (จำกัด ≤ 5MB)';
                 } elseif ($_FILES['post_doc']['error'] === UPLOAD_ERR_OK) {
                     $ext = strtolower(pathinfo($_FILES['post_doc']['name'], PATHINFO_EXTENSION));
                     if (in_array($ext, ['pdf', 'doc', 'docx', 'ppt', 'pptx'], true) && $_FILES['post_doc']['size'] <= 5 * 1024 * 1024) {
                         $doc_file = time() . '_doc_' . preg_replace('/[^a-zA-Z0-9._-]/', '', basename($_FILES['post_doc']['name']));
-                        move_uploaded_file($_FILES['post_doc']['tmp_name'], $upload_dir . $doc_file);
+                        if (move_uploaded_file($_FILES['post_doc']['tmp_name'], $upload_dir . $doc_file)) {
+                            @chmod($upload_dir . $doc_file, 0644);
+                        }
                     } else {
-                        $post_err = '❌ เอกสารอนุญาตเฉพาะ .pdf, .doc, .docx, .pptx ขนาดไม่เกิน 5MB เท่านั้น';
+                        $post_err = '❌ เอกสารอนุญาตเฉพาะ .pdf, .doc, .docx, .pptx ขนาดไม่เกิน 5MB';
                     }
                 }
             }
 
             if (!$post_err) {
-                $st = $conn->prepare("INSERT INTO cat_sale_posts (user_id, content, image_file, video_file, doc_file, drive_link) VALUES (?, ?, ?, ?, ?, ?)");
-                $st->bind_param("isssss", $user_id, $content, $img_file, $vid_file, $doc_file, $drive_link);
+                $ptype = 'sale';
+                $st = $conn->prepare("INSERT INTO cat_sale_posts (user_id, post_type, content, image_file, video_file, doc_file, drive_link) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $st->bind_param("issssss", $user_id, $ptype, $content, $img_file, $vid_file, $doc_file, $drive_link);
                 $st->execute();
                 $st->close();
                 header("Location: buy_cat.php?posted=1");
@@ -114,9 +115,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
         }
     }
 
-    // B. ลบโพสต์ (เฉพาะเจ้าของโพสต์เท่านั้น)
-    if (isset($_POST['delete_post_id'])) {
-        $del_id = (int)$_POST['delete_post_id'];
+    if (isset($_POST['confirm_delete_post_id'])) {
+        $del_id = (int)$_POST['confirm_delete_post_id'];
         $st = $conn->prepare("DELETE FROM cat_sale_posts WHERE id = ? AND user_id = ?");
         $st->bind_param("ii", $del_id, $user_id);
         $st->execute();
@@ -125,7 +125,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
         exit();
     }
 
-    // C. กดถูกใจรูปแมว 4 อารมณ์ (กดซ้ำ = เอาออก)
     if (isset($_POST['react_post_id'], $_POST['reaction_type'])) {
         $pid = (int)$_POST['react_post_id'];
         $rtype = in_array($_POST['reaction_type'], ['happy', 'sad', 'love', 'angry'], true) ? $_POST['reaction_type'] : 'happy';
@@ -155,7 +154,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
         exit();
     }
 
-    // D. เพิ่ม / แก้ไข / ลบ ความคิดเห็น
     if (isset($_POST['add_comment_post_id'])) {
         $pid = (int)$_POST['add_comment_post_id'];
         $ctext = trim((string)($_POST['comment_text'] ?? ''));
@@ -190,7 +188,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
         exit();
     }
 
-    // E. กดติดตาม / ยืนยันเลิกติดตาม
     if (isset($_POST['follow_target_id'])) {
         $tid = (int)$_POST['follow_target_id'];
         if ($tid !== $user_id) {
@@ -213,21 +210,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
     }
 }
 
-// ดึงข้อมูลผู้ใช้ปัจจุบัน
 $stmt = $conn->prepare("SELECT full_name, email, avatar FROM users WHERE id = ? LIMIT 1");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-// ดึงโพสต์ขายแมวสาธารณะทั้งหมด
 $sale_posts = [];
-$res_p = $conn->query("SELECT p.*, u.full_name, u.avatar FROM cat_sale_posts p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC");
+$res_p = $conn->query("SELECT p.*, u.full_name, u.avatar FROM cat_sale_posts p JOIN users u ON p.user_id = u.id WHERE p.post_type = 'sale' ORDER BY p.created_at DESC");
 if ($res_p) {
     while ($row = $res_p->fetch_assoc()) $sale_posts[] = $row;
 }
 
-// ตัวแปรปฏิทิน & เวลาโลก
 $month = isset($_GET['month']) ? max(1, min(12, (int)$_GET['month'])) : (int)date('n');
 $year  = isset($_GET['year'])  ? (int)$_GET['year'] : (int)date('Y');
 $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
@@ -239,9 +233,9 @@ $tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i')
 
 $edit_cid = isset($_GET['edit_comment']) ? (int)$_GET['edit_comment'] : 0;
 $unfollow_uid = isset($_GET['ask_unfollow']) ? (int)$_GET['ask_unfollow'] : 0;
+$ask_delete_pid = isset($_GET['ask_delete']) ? (int)$_GET['ask_delete'] : 0;
 $share_pid = isset($_GET['share_post']) ? (int)$_GET['share_post'] : 0;
 
-// รายการแมว 6 ตัว + ค้นหา/กรองสายพันธุ์
 $cat_list = [
     ['id'=>1,'name'=>'Mochi','price'=>'12,000','breed'=>'บริติช ชอร์ตแฮร์','img'=>'https://images.unsplash.com/photo-1592194996308-7b43878e84a6?w=600&auto=format&fit=crop&q=80'],
     ['id'=>2,'name'=>'Leo','price'=>'8,500','breed'=>'เปอร์เซีย','img'=>'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=600&auto=format&fit=crop&q=80'],
@@ -284,6 +278,10 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
         .act-btn { background: #fff0f3; border: 1px solid #ffccd5; border-radius: 14px; padding: 7px 14px; font-size: 13px; color: #d81b60; cursor: pointer; text-decoration: none; display: inline-block; font-family: 'Kanit', sans-serif; }
         .comment-box { background: #fff8f9; border-radius: 12px; padding: 10px 14px; margin-top: 8px; font-size: 13px; border: 1px solid #ffe4e8; }
         .modal-confirm { background: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 14px; margin-bottom: 18px; font-size: 13.5px; color: #856404; }
+        .delete-confirm-box { background: #ffebee; border: 1px solid #ef9a9a; padding: 14px 16px; border-radius: 14px; margin: 10px 0; font-size: 13px; color: #b71c1c; line-height: 1.6; }
+        .share-box { margin-top: 10px; padding: 12px; background: #f3e5f5; border-radius: 12px; border: 1px solid #ce93d8; }
+        .share-box-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .copy-icon-btn { display: inline-flex; align-items: center; gap: 4px; background: #8e24aa; color: #fff; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
         .filter-bar { display: flex; gap: 10px; align-items: center; margin-top: 25px; }
         .filter-bar input { flex: 1; padding: 12px 20px; border-radius: 20px; border: 1px solid #ffccd5; background: white; font-family: 'Kanit', sans-serif; outline: none; }
         .filter-bar select { padding: 12px 16px; border-radius: 20px; border: 1px solid #ffccd5; background: white; font-family: 'Kanit', sans-serif; outline: none; }
@@ -325,7 +323,6 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
 
         <?php if ($post_err): ?><div style="background:#ffebee; color:#b71c1c; padding:10px 15px; border-radius:12px; margin-bottom:15px;"><?= auth_escape($post_err) ?></div><?php endif; ?>
 
-        <!-- กล่องยืนยันการเลิกติดตาม -->
         <?php if ($unfollow_uid > 0): ?>
             <div class="modal-confirm">
                 <strong>⚠️ คุณแน่ใจหรือไม่ว่าจะเลิกติดตาม?</strong><br>
@@ -341,22 +338,21 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
             </div>
         <?php endif; ?>
 
-        <!-- แถบยาวสำหรับโพสต์ข้อความขายแมวสาธารณะ -->
         <form method="POST" action="buy_cat.php" enctype="multipart/form-data" class="composer-card">
             <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
             <div style="display:flex; gap:12px; align-items:center;">
-                <img src="assets/images/<?= htmlspecialchars(resolve_av($current_user['avatar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">
+                <img src="<?= htmlspecialchars(resolve_av_url($current_user['avatar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">
                 <input type="text" name="post_content" class="composer-input" placeholder="ลงประกาศขายน้องแมว (ระบุสายพันธุ์ ราคา นิสัย)...">
             </div>
             <div class="composer-tools">
                 <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                    <label class="tool-pill" title="จำกัด 1 ไฟล์ (.pdf, .doc, .docx, .pptx) ไม่เกิน 5MB">
+                    <label class="tool-pill" title="จำกัด 1 ไฟล์ (.pdf, .doc, .docx, .pptx) ≤ 5MB">
                         📎 ไฟล์เอกสาร <input type="file" name="post_doc" accept=".pdf,.doc,.docx,.ppt,.pptx" style="display:none;">
                     </label>
-                    <label class="tool-pill" title="จำกัด 1 รูปภาพ (.jpg, .jpeg, .png) ไม่เกิน 5MB">
+                    <label class="tool-pill" title="จำกัด 1 รูปภาพ (.jpg, .jpeg, .png) ≤ 5MB">
                         🖼️ รูปภาพ <input type="file" name="post_image" accept=".jpg,.jpeg,.png" style="display:none;">
                     </label>
-                    <label class="tool-pill" title="จำกัด 1 วิดีโอ (.mp4, .webm) ไม่เกิน 15MB">
+                    <label class="tool-pill" title="จำกัด 1 วิดีโอ (.mp4, .webm) ≤ 15MB">
                         🎞️ วิดีโอ <input type="file" name="post_video" accept=".mp4,.webm" style="display:none;">
                     </label>
                     <input type="url" name="drive_link" placeholder="🔗 ลิงก์ Google Drive (ถ้ามี)" style="padding:6px 12px; border:1px solid #ffccd5; border-radius:14px; font-size:12px; background:#fff8f9;">
@@ -368,7 +364,6 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
             </div>
         </form>
 
-        <!-- ฟีดโพสต์ขายแมวสาธารณะ -->
         <?php foreach ($sale_posts as $sp):
             $pid = (int)$sp['id'];
             $author_id = (int)$sp['user_id'];
@@ -405,11 +400,14 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
             $cq->close();
 
             $my_emoji = ['happy'=>'😺', 'sad'=>'😿', 'love'=>'😻', 'angry'=>'😾'][$my_react] ?? '';
+            $post_img_ok = !empty($sp['image_file']) && is_file(__DIR__ . '/uploads/posts/' . basename($sp['image_file']));
+            $post_vid_ok = !empty($sp['video_file']) && is_file(__DIR__ . '/uploads/posts/' . basename($sp['video_file']));
+            $post_doc_ok = !empty($sp['doc_file']) && is_file(__DIR__ . '/uploads/posts/' . basename($sp['doc_file']));
         ?>
         <div class="feed-card" id="post-<?= $pid ?>">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <a href="user_profile.php?id=<?= $author_id ?>" style="display:flex; gap:10px; align-items:center; text-decoration:none; color:#333;">
-                    <img src="assets/images/<?= htmlspecialchars(resolve_av($sp['avatar']), ENT_QUOTES, 'UTF-8') ?>" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">
+                    <img src="<?= htmlspecialchars(resolve_av_url($sp['avatar']), ENT_QUOTES, 'UTF-8') ?>" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">
                     <div>
                         <strong><?= htmlspecialchars($sp['full_name'], ENT_QUOTES, 'UTF-8') ?></strong>
                         <div style="font-size:12px; color:#888;"><?= time_ago_th($sp['created_at']) ?></div>
@@ -428,27 +426,39 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
                         <?php endif; ?>
                     <?php endif; ?>
                     <?php if ($is_owner): ?>
-                        <form method="POST" action="buy_cat.php" style="margin:0;">
-                            <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
-                            <input type="hidden" name="delete_post_id" value="<?= $pid ?>">
-                            <button type="submit" class="act-btn" style="background:#ffebee; color:#c62828;">🗑️ ลบโพสต์</button>
-                        </form>
+                        <a href="buy_cat.php?ask_delete=<?= $pid ?>#post-<?= $pid ?>" class="act-btn" style="background:#ffebee; color:#c62828;">🗑️ ลบโพสต์</a>
                     <?php endif; ?>
                 </div>
             </div>
 
+            <?php if ($ask_delete_pid === $pid && $is_owner): ?>
+                <div class="delete-confirm-box">
+                    <strong>⚠️ คุณแน่ใจหรือไม่ว่าจะลบโพสต์ ถ้าลบโพสต์ไปแล้ว จะไม่สามารถกู้คืนได้อีก เว้นแต่ต้องติดต่อผู้ดูแลระบบนี้เท่านั้น</strong><br>
+                    Are you sure you want to delete this post? Once deleted, it cannot be recovered unless you contact this administrator.<br>
+                    <small><strong>(ผู้ดูแลระบบ Find My Meow Meow)</strong></small>
+                    <div style="margin-top:10px; display:flex; gap:10px;">
+                        <form method="POST" action="buy_cat.php" style="margin:0;">
+                            <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                            <input type="hidden" name="confirm_delete_post_id" value="<?= $pid ?>">
+                            <button type="submit" style="background:#c62828; color:white; border:none; padding:6px 14px; border-radius:10px; cursor:pointer; font-family:'Kanit';">ใช่ แน่นอน (Yes Sure)</button>
+                        </form>
+                        <a href="buy_cat.php#post-<?= $pid ?>" style="background:#fff; color:#555; border:1px solid #ccc; padding:6px 14px; border-radius:10px; text-decoration:none;">ยกเลิก (Cancel)</a>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <p style="font-size:14px; line-height:1.6;"><?= nl2br(htmlspecialchars($sp['content'], ENT_QUOTES, 'UTF-8')) ?></p>
 
-            <?php if (!empty($sp['image_file'])): ?>
-                <img src="uploads/posts/<?= htmlspecialchars($sp['image_file'], ENT_QUOTES, 'UTF-8') ?>" style="width:100%; max-height:360px; object-fit:cover; border-radius:14px; margin-top:8px;">
+            <?php if ($post_img_ok): ?>
+                <img src="uploads/posts/<?= rawurlencode(basename($sp['image_file'])) ?>" style="width:100%; max-height:360px; object-fit:cover; border-radius:14px; margin-top:8px;">
             <?php endif; ?>
-            <?php if (!empty($sp['video_file'])): ?>
+            <?php if ($post_vid_ok): ?>
                 <video controls style="width:100%; max-height:360px; border-radius:14px; margin-top:8px;">
-                    <source src="uploads/posts/<?= htmlspecialchars($sp['video_file'], ENT_QUOTES, 'UTF-8') ?>">
+                    <source src="uploads/posts/<?= rawurlencode(basename($sp['video_file'])) ?>">
                 </video>
             <?php endif; ?>
-            <?php if (!empty($sp['doc_file'])): ?>
-                <div style="margin-top:8px;"><a href="uploads/posts/<?= htmlspecialchars($sp['doc_file'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="act-btn">📎 ดาวน์โหลดเอกสารแนบ</a></div>
+            <?php if ($post_doc_ok): ?>
+                <div style="margin-top:8px;"><a href="uploads/posts/<?= rawurlencode(basename($sp['doc_file'])) ?>" target="_blank" class="act-btn">📎 ดาวน์โหลดเอกสารแนบ</a></div>
             <?php endif; ?>
             <?php if (!empty($sp['drive_link'])): ?>
                 <div style="margin-top:8px;"><a href="<?= htmlspecialchars($sp['drive_link'], ENT_QUOTES, 'UTF-8') ?>" target="_blank" class="act-btn">🔗 เปิดไฟล์ Google Drive</a></div>
@@ -472,10 +482,16 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
                 <a href="buy_cat.php?share_post=<?= $pid ?>#post-<?= $pid ?>" class="act-btn">🔗 แชร์โพสต์</a>
             </div>
 
-            <?php if ($share_pid === $pid): ?>
-                <div style="margin-top:10px; padding:10px; background:#f3e5f5; border-radius:12px; font-size:12.5px;">
-                    <strong>📋 คัดลอกข้อความและรูปภาพโพสต์นี้:</strong>
-                    <textarea readonly style="width:100%; margin-top:6px; padding:8px; border-radius:8px; border:1px solid #ce93d8; font-family:'Kanit';"><?= htmlspecialchars($sp['content'] . (!empty($sp['image_file']) ? "\nรูปภาพ: uploads/posts/" . $sp['image_file'] : ''), ENT_QUOTES, 'UTF-8') ?></textarea>
+            <?php if ($share_pid === $pid):
+                $share_url = 'https://angsila.cs.buu.ac.th/~68160183/login/buy_cat.php#post-' . $pid;
+                $share_txt = $sp['content'] . "\nลิงก์โพสต์: " . $share_url . ($post_img_ok ? "\nรูปภาพ: https://angsila.cs.buu.ac.th/~68160183/login/uploads/posts/" . basename($sp['image_file']) : '');
+            ?>
+                <div class="share-box">
+                    <div class="share-box-header">
+                        <label for="copy-box-<?= $pid ?>" class="copy-icon-btn" title="คลิกเพื่อเลือกข้อความสำหรับคัดลอก">📋 Copy</label>
+                        <strong style="font-size:12.5px; color:#6a1b9a;">คัดลอกลิงก์ ข้อความ และรูปภาพโพสต์นี้</strong>
+                    </div>
+                    <textarea id="copy-box-<?= $pid ?>" readonly rows="3" style="width:100%; padding:8px; border-radius:8px; border:1px solid #ce93d8; font-family:'Kanit'; font-size:12.5px;"><?= htmlspecialchars($share_txt, ENT_QUOTES, 'UTF-8') ?></textarea>
                 </div>
             <?php endif; ?>
 
@@ -514,7 +530,6 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
         </div>
         <?php endforeach; ?>
 
-        <!-- แถบค้นหาและกรองสายพันธุ์แมว (1 ชุด) -->
         <form method="GET" action="buy_cat.php" class="filter-bar">
             <input type="text" name="cat_q" value="<?= htmlspecialchars($cat_q, ENT_QUOTES, 'UTF-8') ?>" placeholder="🔍 ค้นหาแมวที่คุณรัก (ชื่อ หรือ สายพันธุ์)...">
             <select name="breed">
@@ -526,7 +541,6 @@ $filtered_cats = array_filter($cat_list, fn($c) => ($cat_q === '' || stripos($c[
             <button type="submit">ค้นหา</button>
         </form>
 
-        <!-- แคตตาล็อกแมวแนะนำ 6 ตัว -->
         <div class="catalog-grid">
             <?php if (empty($filtered_cats)): ?>
                 <p style="grid-column:1/-1; text-align:center; color:#888;">ไม่พบน้องแมวที่ตรงกับเงื่อนไขการค้นหา</p>

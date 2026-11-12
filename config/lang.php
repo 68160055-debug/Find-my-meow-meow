@@ -13,7 +13,7 @@ $txt = [
         'nav_profile'  => '👤 ประวัติผู้ใช้งาน',
         'nav_contact'  => '✉️ ติดต่อผู้ประกาศ/แอดมิน',
         'nav_buy'      => '🛒 ซื้อแมว',
-        'nav_chat'     => '💬 ติดต่อผู้ขอรับเลี้ยง',
+        'nav_chat'     => '👤 สมัครเป็นผู้รับเลี้ยงและติดต่อผ่านแชท',
         'nav_settings' => '⚙️ การตั้งค่า',
         'nav_logout'   => '🚪 ออกจากระบบ',
 
@@ -55,7 +55,7 @@ $txt = [
         'nav_profile'  => '👤 User Profile',
         'nav_contact'  => '✉️ Contact Us / Admin',
         'nav_buy'      => '🛒 Buy Cat',
-        'nav_chat'     => '💬 Chat with Adopter',
+        'nav_chat'     => '👤 Adopter Register and Contact',
         'nav_settings' => '⚙️ Settings',
         'nav_logout'   => '🚪 Logout',
 
