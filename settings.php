@@ -1,6 +1,7 @@
 <?php
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+date_default_timezone_set('Asia/Bangkok');
 
 require_once 'auth.php';
 require_once 'config/db.php';
@@ -13,7 +14,8 @@ $error = '';
 
 // 1. รับค่าเมื่อผู้ใช้กดเปลี่ยนภาษา (เพียว PHP)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_lang'])) {
-    $_SESSION['site_lang'] = ($_POST['lang'] === 'en') ? 'en' : 'th';
+    check_auth_token();
+    $_SESSION['site_lang'] = (($_POST['lang'] ?? 'th') === 'en') ? 'en' : 'th';
     header("Location: settings.php?lang_updated=1");
     exit();
 }
@@ -23,21 +25,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_admin_msg'])) {
     check_auth_token();
     $admin_msg = trim((string)($_POST['admin_msg'] ?? ''));
     if ($admin_msg !== '') {
-        $message = ($_SESSION['site_lang'] ?? 'th') === 'en' ? 'Message sent to admin successfully!' : 'ส่งข้อความถึงแอดมินเรียบร้อยแล้ว!';
+        $message = ($current_lang === 'en') ? 'Message sent to admin successfully!' : 'ส่งข้อความถึงแอดมินเรียบร้อยแล้ว!';
     } else {
-        $error = ($_SESSION['site_lang'] ?? 'th') === 'en' ? 'Please enter a message before sending.' : 'กรุณากรอกข้อความก่อนส่ง';
+        $error = ($current_lang === 'en') ? 'Please enter a message before sending.' : 'กรุณากรอกข้อความก่อนส่ง';
     }
 }
 
-// 3. พจนานุกรมแปลภาษา (Dictionary)
-
+// ดึงข้อมูลผู้ใช้งานปัจจุบัน
 $stmt = $conn->prepare("SELECT full_name, email, avatar FROM users WHERE id = ? LIMIT 1");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-
+// ตัวแปรสำหรับปฏิทินด้านขวา
+$month = isset($_GET['month']) ? max(1, min(12, (int)$_GET['month'])) : (int)date('n');
+$year  = isset($_GET['year'])  ? (int)$_GET['year'] : (int)date('Y');
+$days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+$first_day_of_week = (int)date('w', strtotime(sprintf('%04d-%02d-01', $year, $month)));
+?>
 <!doctype html>
 <html lang="<?= $current_lang ?>">
 <head>
@@ -83,7 +89,10 @@ $stmt->close();
         <a href="adopter.php" class="dash-nav-item"><?= $L['nav_chat'] ?></a>
         <a href="settings.php" class="dash-nav-item active"><?= $L['nav_settings'] ?></a>
         <div style="margin-top: auto;">
-            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;"><?= $L['nav_logout'] ?></a>
+            <form action="logout.php" method="POST" style="margin: 0;">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                <button type="submit" class="dash-nav-item" style="width: 100%; background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5; cursor: pointer; font-family: 'Kanit', sans-serif;"><?= $L['nav_logout'] ?></button>
+            </form>
         </div>
     </aside>
 
@@ -93,13 +102,18 @@ $stmt->close();
 
         <h2 style="color: #d81b60; margin-top: 0; margin-bottom: 20px;"><?= $L['heading'] ?></h2>
 
-        <?php if($message): ?><p style="color: green; font-size: 14px; background: #e8f5e9; padding: 10px; border-radius: 10px;"><?=auth_escape($message)?></p><?php endif; ?>
-        <?php if($error): ?><p style="color: red; font-size: 14px; background: #ffebee; padding: 10px; border-radius: 10px;"><?=auth_escape($error)?></p><?php endif; ?>
+        <?php if ($message): ?>
+            <p style="color: green; font-size: 14px; background: #e8f5e9; padding: 10px; border-radius: 10px;"><?= auth_escape($message) ?></p>
+        <?php endif; ?>
+        <?php if ($error): ?>
+            <p style="color: red; font-size: 14px; background: #ffebee; padding: 10px; border-radius: 10px;"><?= auth_escape($error) ?></p>
+        <?php endif; ?>
 
         <!-- 1. การตั้งค่าภาษา (HTML Form + PHP) -->
         <div class="settings-card">
             <div class="section-header"><?= $L['sec_lang'] ?></div>
             <form method="POST" action="settings.php" style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0;">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                 <div class="setting-info">
                     <h5><?= $L['lang_title'] ?></h5>
                     <p><?= $L['lang_desc'] ?></p>
@@ -109,7 +123,7 @@ $stmt->close();
                         <option value="th" <?= $current_lang === 'th' ? 'selected' : '' ?>>🇹🇭 ไทย (TH)</option>
                         <option value="en" <?= $current_lang === 'en' ? 'selected' : '' ?>>🇬🇧 English (EN)</option>
                     </select>
-                    <button type="submit" name="change_lang" style="background: #d81b60; color: white; border: none; padding: 9px 18px; border-radius: 12px; font-weight: 500; cursor: pointer; font-family: 'Kanit';">
+                    <button type="submit" name="change_lang" style="background: #d81b60; color: white; border: none; padding: 9px 18px; border-radius: 12px; font-weight: 500; cursor: pointer; font-family: 'Kanit', sans-serif;">
                         <?= $L['btn_save_lang'] ?>
                     </button>
                 </div>
@@ -133,7 +147,7 @@ $stmt->close();
             <div class="section-header"><?= $L['sec_admin'] ?></div>
             <p style="font-size: 13px; color: #666; margin-top: 0;"><?= $L['admin_desc'] ?></p>
             <form method="POST" action="settings.php">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                 <textarea name="admin_msg" class="admin-textarea" placeholder="<?= $L['admin_ph'] ?>" required></textarea>
                 <div style="text-align: right;">
                     <button type="submit" name="send_admin_msg" class="btn-send-msg"><?= $L['btn_send'] ?></button>
@@ -145,12 +159,14 @@ $stmt->close();
         <div class="settings-card">
             <div class="section-header"><?= $L['sec_account'] ?></div>
             <p style="font-size: 14px; color: #666;"><?= $L['logout_prompt'] ?></p>
-            <a href="logout.php" style="display: block; text-align: center; background: #ff758c; color: white; padding: 12px 30px; border-radius: 14px; font-size: 15px; font-weight: 600; text-decoration: none;"><?= $L['btn_logout'] ?></a>
+            <form action="logout.php" method="POST" style="margin: 0;">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                <button type="submit" style="width: 100%; background: #ff758c; color: white; border: none; padding: 12px 30px; border-radius: 14px; font-size: 15px; font-weight: 600; cursor: pointer; font-family: 'Kanit', sans-serif;"><?= $L['btn_logout'] ?></button>
+            </form>
         </div>
     </main>
 
     <!-- แถบปฏิทินด้านขวา -->
-<!-- แถบปฏิทินด้านขวา -->
     <aside class="dash-right">
         <div class="widget-box">
             <?php
@@ -179,7 +195,8 @@ $stmt->close();
                     } else {
                         echo "<td></td>";
                     }
-                    if ($i % 7 == 6) echo "</tr><tr>";
+                    if ($i % 7 == 6 && $current_day <= $days_in_month) echo "</tr><tr>";
+                    elseif ($i % 7 == 6) break;
                 }
                 ?>
                 </tr>
@@ -189,20 +206,3 @@ $stmt->close();
 </div>
 </body>
 </html>
-
-<?php
-// คำนวณเวลาปัจจุบันด้วย Pure PHP (ไม่ใช้ JavaScript)
-$tz_th = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('H:i');
-$tz_jp = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('H:i');
-$tz_us = (new DateTime('now', new DateTimeZone('America/New_York')))->format('H:i');
-$tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i');
-?>
-<div class="widget-box" style="text-align: left;">
-    <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
-    <ul class="world-time-list">
-        <li class="world-time-item"><span>TH ไทย (UTC+7)</span> <strong><?= $tz_th ?></strong></li>
-        <li class="world-time-item"><span>JP ญี่ปุ่น (UTC+9)</span> <strong><?= $tz_jp ?></strong></li>
-        <li class="world-time-item"><span>US สหรัฐฯ (UTC-4/5)</span> <strong><?= $tz_us ?></strong></li>
-        <li class="world-time-item"><span>GB สหราชอาณาจักร</span> <strong><?= $tz_uk ?></strong></li>
-    </ul>
-</div>

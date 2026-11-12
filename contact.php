@@ -1,19 +1,25 @@
 <?php
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+date_default_timezone_set('Asia/Bangkok');
 
 require_once 'auth.php';
 require_once 'config/db.php';
-require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
+if (file_exists('config/lang.php')) {
+    require_once 'config/lang.php';
+}
 require_login();
 
 $user_id = $_SESSION['user_id'];
+$is_en = (($_SESSION['site_lang'] ?? 'th') === 'en');
 $message = '';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_auth_token();
-    $message = 'ส่งข้อมูลเรียบร้อยแล้ว! ทีมงานจะรีบติดต่อกลับโดยเร็วที่สุด';
+    $message = $is_en
+        ? 'Information submitted successfully! Our team will contact you shortly.'
+        : 'ส่งข้อมูลเรียบร้อยแล้ว! ทีมงานจะรีบติดต่อกลับโดยเร็วที่สุด';
 }
 
 $stmt = $conn->prepare("SELECT full_name, email, avatar FROM users WHERE id = ? LIMIT 1");
@@ -22,18 +28,23 @@ $stmt->execute();
 $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-$month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
-$year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+$month = isset($_GET['month']) ? max(1, min(12, (int)$_GET['month'])) : (int)date('n');
+$year  = isset($_GET['year'])  ? (int)$_GET['year'] : (int)date('Y');
 $days_in_month = cal_days_in_month(CAL_GREGORIAN, $month, $year);
-$first_day_of_week = date('w', strtotime("$year-$month-01"));
-$month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์', 3=>'มีนาคม', 4=>'เมษายน', 5=>'พฤษภาคม', 6=>'มิถุนายน', 7=>'กรกฎาคม', 8=>'สิงหาคม', 9=>'กันยายน', 10=>'ตุลาคม', 11=>'พฤศจิกายน', 12=>'ธันวาคม'];
+$first_day_of_week = (int)date('w', strtotime(sprintf('%04d-%02d-01', $year, $month)));
+
+// คำนวณเวลาปัจจุบัน 4 ประเทศด้วย Pure PHP (ไม่ใช้ JavaScript)
+$tz_th = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('H:i');
+$tz_jp = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('H:i');
+$tz_us = (new DateTime('now', new DateTimeZone('America/New_York')))->format('H:i');
+$tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i');
 ?>
 <!doctype html>
-<html lang="th">
+<html lang="<?= $is_en ? 'en' : 'th' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ติดต่อผู้ประกาศ/แอดมิน - Find my meow meow 💖</title>
+    <title><?= $is_en ? 'Contact Us / Admin - Find my meow meow 💖' : 'ติดต่อผู้ประกาศ/แอดมิน - Find my meow meow 💖' ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -60,8 +71,8 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
         .calendar-table { width: 100%; font-size: 13px; border-collapse: collapse; text-align: center; margin-top: 10px; }
         .calendar-table td, .calendar-table th { padding: 6px 2px; }
         .cal-today { background: #d81b60; color: white; border-radius: 50%; display: inline-block; width: 24px; height: 24px; line-height: 24px; font-weight: 600; }
-        .cal-past { color: #333; cursor: pointer; }
-        .cal-future { color: #ccc; cursor: not-allowed; }
+        .cal-past { color: #333; }
+        .cal-future { color: #ccc; }
         .world-time-list { list-style: none; padding: 0; margin: 0; text-align: left; font-size: 13px; }
         .world-time-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ffccd5; }
     </style>
@@ -71,54 +82,59 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
 <div class="dashboard-layout">
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
-        <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
-        <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
-        <a href="contact.php" class="dash-nav-item active">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
-        <a href="buy_cat.php" class="dash-nav-item">🛒 ซื้อแมว</a>
-        <a href="adopter.php" class="dash-nav-item">💬 ติดต่อผู้ขอรับเลี้ยง</a>
-        <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
+        <a href="index.php" class="dash-nav-item"><?= $L['nav_home'] ?? '🏠 หน้าแรก' ?></a>
+        <a href="profile.php" class="dash-nav-item"><?= $L['nav_profile'] ?? '👤 ประวัติผู้ใช้งาน' ?></a>
+        <a href="contact.php" class="dash-nav-item active"><?= $L['nav_contact'] ?? '✉️ ติดต่อผู้ประกาศ/แอดมิน' ?></a>
+        <a href="buy_cat.php" class="dash-nav-item"><?= $L['nav_buy'] ?? '🛒 ซื้อแมว' ?></a>
+        <a href="adopter.php" class="dash-nav-item"><?= $L['nav_chat'] ?? '💬 ติดต่อผู้ขอรับเลี้ยง' ?></a>
+        <a href="settings.php" class="dash-nav-item"><?= $L['nav_settings'] ?? '⚙️ การตั้งค่า' ?></a>
         <div style="margin-top: auto;">
-            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">🚪 ออกจากระบบ</a>
+            <form action="logout.php" method="POST" style="margin: 0;">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                <button type="submit" class="dash-nav-item" style="width: 100%; background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5; cursor: pointer; font-family: 'Kanit', sans-serif;"><?= $L['nav_logout'] ?? '🚪 ออกจากระบบ' ?></button>
+            </form>
         </div>
     </aside>
+
     <main class="dash-main">
-        <!-- แถบค้นหา Google Search Header ด้านบนสุด -->
-        <?php include 'config/search.php'; ?>
-        
-    <main class="dash-main">
+        <!-- แถบค้นหาด้านบนสุด -->
+        <?php if (file_exists('config/search.php')) include 'config/search.php'; ?>
+
         <div class="contact-card">
-            <h2 style="color: #d81b60; margin-top: 0;">✉️ ติดต่อผู้ประกาศ/แอดมิน (Contact Us)</h2>
-            <p style="color: #777; font-size: 14px;">แบบฟอร์ม Find my meow meow สำหรับกรอกข้อมูลส่วนบุคคลของผู้ใช้งานและข้อมูลน้องแมว 💖</p>
+            <h2 style="color: #d81b60; margin-top: 0;"><?= $is_en ? '✉️ Contact Us / Admin' : '✉️ ติดต่อผู้ประกาศ/แอดมิน (Contact Us)' ?></h2>
+            <p style="color: #777; font-size: 14px;"><?= $is_en ? 'Find my meow meow form for user and cat information 💖' : 'แบบฟอร์ม Find my meow meow สำหรับกรอกข้อมูลส่วนบุคคลของผู้ใช้งานและข้อมูลน้องแมว 💖' ?></p>
             
-            <?php if($message): ?><p style="color: green; font-size: 14px; background: #e8f5e9; padding: 10px; border-radius: 10px;"><?=auth_escape($message)?></p><?php endif; ?>
+            <?php if ($message): ?>
+                <p style="color: green; font-size: 14px; background: #e8f5e9; padding: 10px; border-radius: 10px;"><?= auth_escape($message) ?></p>
+            <?php endif; ?>
 
             <form method="post">
-                <input type="hidden" name="auth_csrf" value="<?=auth_escape(auth_token())?>">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                 
-                <div class="form-section-title">👤 ข้อมูลผู้ใช้งาน (User Information)</div>
+                <div class="form-section-title"><?= $is_en ? '👤 User Information' : '👤 ข้อมูลผู้ใช้งาน (User Information)' ?></div>
                 <div class="form-grid">
                     <div class="form-group full">
-                        <label>1. ชื่อ-นามสกุล *</label>
-                        <input type="text" name="full_name" value="<?= htmlspecialchars($current_user['full_name']) ?>" required>
+                        <label><?= $is_en ? '1. Full Name *' : '1. ชื่อ-นามสกุล *' ?></label>
+                        <input type="text" name="full_name" value="<?= htmlspecialchars($current_user['full_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>" required>
                     </div>
                     <div class="form-group">
-                        <label>2. เพศ *</label>
+                        <label><?= $is_en ? '2. Gender *' : '2. เพศ *' ?></label>
                         <select name="gender">
-                            <option value="female">หญิง (Female)</option>
-                            <option value="male">ชาย (Male)</option>
-                            <option value="other">อื่นๆ</option>
+                            <option value="female"><?= $is_en ? 'Female' : 'หญิง (Female)' ?></option>
+                            <option value="male"><?= $is_en ? 'Male' : 'ชาย (Male)' ?></option>
+                            <option value="other"><?= $is_en ? 'Other' : 'อื่นๆ' ?></option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>3. สถานะ/อาชีพ *</label>
-                        <input type="text" name="status" placeholder="เช่น นักเรียน/นักศึกษา">
+                        <label><?= $is_en ? '3. Status / Occupation *' : '3. สถานะ/อาชีพ *' ?></label>
+                        <input type="text" name="status" placeholder="<?= $is_en ? 'e.g., Student' : 'เช่น นักเรียน/นักศึกษา' ?>">
                     </div>
                 </div>
 
-                <div class="form-section-title">🐾 ข้อมูลเกี่ยวกับแมว (Data Cat)</div>
+                <div class="form-section-title"><?= $is_en ? '🐾 Cat Information' : '🐾 ข้อมูลเกี่ยวกับแมว (Data Cat)' ?></div>
                 <div class="form-grid">
                     <div class="form-group">
-                        <label>4. สายพันธุ์ของแมว *</label>
+                        <label><?= $is_en ? '4. Cat Breed *' : '4. สายพันธุ์ของแมว *' ?></label>
                         <select name="breed">
                             <option value="เปอร์เซีย">เปอร์เซีย (Persian)</option>
                             <option value="บริติช ชอร์ตแฮร์">บริติช ชอร์ตแฮร์ (British Shorthair)</option>
@@ -127,19 +143,19 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>5. สถานะของแมว *</label>
+                        <label><?= $is_en ? '5. Cat Status *' : '5. สถานะของแมว *' ?></label>
                         <select name="cat_status">
-                            <option value="ยังหาบ้านอยู่">ยังหาบ้านอยู่</option>
-                            <option value="ได้บ้านแล้ว">ได้บ้านแล้ว</option>
+                            <option value="ยังหาบ้านอยู่"><?= $is_en ? 'Looking for a home' : 'ยังหาบ้านอยู่' ?></option>
+                            <option value="ได้บ้านแล้ว"><?= $is_en ? 'Adopted' : 'ได้บ้านแล้ว' ?></option>
                         </select>
                     </div>
                     <div class="form-group full">
-                        <label>6. รายละเอียดพฤติกรรมของแมว *</label>
-                        <textarea name="behavior" placeholder="เช่น นิสัย ชอบเล่น ขี้กลัว เป็นต้น"></textarea>
+                        <label><?= $is_en ? '6. Cat Behavior Details *' : '6. รายละเอียดพฤติกรรมของแมว *' ?></label>
+                        <textarea name="behavior" placeholder="<?= $is_en ? 'e.g., playful, friendly, shy' : 'เช่น นิสัย ชอบเล่น ขี้กลัว เป็นต้น' ?>"></textarea>
                     </div>
                 </div>
 
-                <button type="submit" class="btn-submit-contact">🚀 ส่งข้อมูล / Submit</button>
+                <button type="submit" class="btn-submit-contact">🚀 <?= $is_en ? 'Submit' : 'ส่งข้อมูล / Submit' ?></button>
             </form>
         </div>
     </main>
@@ -151,14 +167,21 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
                 if ($prev_month < 1) { $prev_month = 12; $prev_year--; }
                 $next_month = $month + 1; $next_year = $year;
                 if ($next_month > 12) { $next_month = 1; $next_year++; }
+                $month_name = $L['months'][$month] ?? date('F', mktime(0, 0, 0, $month, 1));
+                $display_year = $is_en ? $year : ($year + 543);
+                $days_header = $L['days'] ?? ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
             ?>
             <div style="display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 14px; color: #d81b60;">
                 <a href="?month=<?= $prev_month ?>&year=<?= $prev_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">‹</a>
-                <span><?= $month_names_th[$month] ?> <?= $year + 543 ?></span>
+                <span><?= $month_name ?> <?= $display_year ?></span>
                 <a href="?month=<?= $next_month ?>&year=<?= $next_year ?>" style="text-decoration:none; color:#d81b60; font-size:18px;">›</a>
             </div>
             <table class="calendar-table">
-                <tr><th>อา</th><th>จ</th><th>อ</th><th>พ</th><th>พฤ</th><th>ศ</th><th>ส</th></tr>
+                <tr>
+                    <?php foreach ($days_header as $d): ?>
+                        <th><?= $d ?></th>
+                    <?php endforeach; ?>
+                </tr>
                 <tr>
                 <?php
                 $current_day = 1; $today_d = (int)date('j'); $today_m = (int)date('n'); $today_y = (int)date('Y');
@@ -171,34 +194,24 @@ $month_names_th = [1=>'มกราคม', 2=>'กุมภาพันธ์',
                         else echo "<td><span class='cal-past'>{$current_day}</span></td>";
                         $current_day++;
                     } else { echo "<td></td>"; }
-                    if ($i % 7 == 6) echo "</tr><tr>";
+                    if ($i % 7 == 6 && $current_day <= $days_in_month) echo "</tr><tr>";
+                    elseif ($i % 7 == 6) break;
                 }
                 ?>
                 </tr>
             </table>
         </div>
+
         <div class="widget-box" style="text-align: left;">
-            <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
+            <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 <?= $is_en ? 'World Time' : 'เวลาปัจจุบันตามประเทศ' ?></h4>
             <ul class="world-time-list">
-                <li class="world-time-item"><span>🇹🇭 ไทย (UTC+7)</span> <strong id="time-th">--:--</strong></li>
-                <li class="world-time-item"><span>🇯🇵 ญี่ปุ่น (UTC+9)</span> <strong id="time-jp">--:--</strong></li>
-                <li class="world-time-item"><span>🇺🇸 สหรัฐฯ (UTC-4)</span> <strong id="time-us">--:--</strong></li>
-                <li class="world-time-item"><span>🇬🇧 สหราชอาณาจักร</span> <strong id="time-uk">--:--</strong></li>
+                <li class="world-time-item"><span>TH ไทย (UTC+7)</span> <strong><?= $tz_th ?></strong></li>
+                <li class="world-time-item"><span>JP ญี่ปุ่น (UTC+9)</span> <strong><?= $tz_jp ?></strong></li>
+                <li class="world-time-item"><span>US สหรัฐฯ (UTC-4/5)</span> <strong><?= $tz_us ?></strong></li>
+                <li class="world-time-item"><span>GB สหราชอาณาจักร</span> <strong><?= $tz_uk ?></strong></li>
             </ul>
         </div>
     </aside>
 </div>
-
-<script>
-    function updateWorldTimes() {
-        const now = new Date();
-        document.getElementById('time-th').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-jp').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-us').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
-        document.getElementById('time-uk').innerText = now.toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
-    }
-    setInterval(updateWorldTimes, 1000); updateWorldTimes();
-</script>
 </body>
 </html>
-

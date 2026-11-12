@@ -4,10 +4,22 @@ error_reporting(E_ALL);
 
 require_once 'auth.php';
 require_once 'config/db.php';
-require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
+if (file_exists('config/lang.php')) {
+    require_once 'config/lang.php';
+}
 require_login();
 
 $user_id = $_SESSION['user_id'] ?? 0;
+$is_en = (($_SESSION['site_lang'] ?? 'th') === 'en');
+
+// ฟังก์ชันช่วยตรวจสอบรูปภาพฝั่งเซิร์ฟเวอร์ด้วย Pure PHP (ไม่ใช้ JavaScript onerror)
+function resolve_img($filename, $fallback = 'student.jpg') {
+    $safe = basename((string)$filename);
+    if ($safe !== '' && is_file(__DIR__ . '/assets/images/' . $safe)) {
+        return $safe;
+    }
+    return $fallback;
+}
 
 // ดึงข้อมูลผู้ใช้งานปัจจุบัน
 $stmt = $conn->prepare("SELECT full_name, email, avatar, nickname FROM users WHERE id = ? LIMIT 1");
@@ -107,10 +119,9 @@ if ($q !== '') {
     $res = $conn->query("SELECT id, full_name, nickname, email, avatar, status, bio FROM users");
     if ($res) {
         while ($u = $res->fetch_assoc()) {
-            $search_blob = $u['full_name'] . ' ' . $u['nickname'] . ' ' . $u['email'] . ' ' . $u['status'] . ' ' . $u['bio'];
+            $search_blob = ($u['full_name'] ?? '') . ' ' . ($u['nickname'] ?? '') . ' ' . ($u['email'] ?? '') . ' ' . ($u['status'] ?? '') . ' ' . ($u['bio'] ?? '');
             if (match_google_query($search_blob, $exact_phrases, $exclude_terms, $and_terms, $or_terms)) {
-                // แยกแอดมินหรือผู้ใช้ทั่วไป
-                if (stripos($u['status'], 'admin') !== false || stripos($u['email'], 'admin') !== false || stripos($u['full_name'], 'admin') !== false) {
+                if (stripos((string)$u['status'], 'admin') !== false || stripos((string)$u['email'], 'admin') !== false || stripos((string)$u['full_name'], 'admin') !== false) {
                     $found_admins[] = $u;
                 } else {
                     $found_users[] = $u;
@@ -139,12 +150,12 @@ if ($q !== '') {
 
     // 3. ค้นหาชื่อโพสต์ / รายการประกาศหาบ้านและแมว
     $catalog_posts = [
-        ['title' => 'น้องเหมียวตัวน้อยหาบ้านใหม่ สุขภาพแข็งแรง ขี้อ้อนมาก', 'author' => 'CatLover_Official', 'cat_name' => 'ส้มจิ๋ว', 'breed' => 'ไทยแท้', 'price' => 'ฟรี (หาบ้าน)', 'img' => 'cat.png', 'desc' => 'น้องอายุ 2 เดือน กินเก่ง เข้ากระบะทรายเป็นแล้ว'],
-        ['title' => 'เปิดรับจองลูกแมว Mochi สก็อตติชโฟลด์แท้', 'author' => 'ฟาร์มแมวเหมียวใจดี', 'cat_name' => 'Mochi', 'breed' => 'บริติช ชอร์ตแฮร์', 'price' => '12,000 บาท', 'img' => 'cat.png', 'desc' => 'น่ารัก ตาโต สุขภาพแข็งแรง ฉีดวัคซีนแล้ว'],
-        ['title' => 'น้อง Leo แมวเปอร์เซียขนฟู สีส้มสดใส', 'author' => 'Neko House', 'cat_name' => 'Leo', 'breed' => 'เปอร์เซีย', 'price' => '8,500 บาท', 'img' => 'cat.png', 'desc' => 'ขนยาว นุ่มสลวย ขี้เล่น อารมณ์ดี'],
-        ['title' => 'น้อง Luna แมวน้อยสีขาวแต้มส้ม น่ารักเรียบร้อย', 'author' => 'Cat Society', 'cat_name' => 'Luna', 'breed' => 'สก็อตติช โฟลด์', 'price' => '8,500 บาท', 'img' => 'cat.png', 'desc' => 'เรียบร้อย ไม่ดื้อ เลี้ยงในระบบปิด'],
-        ['title' => 'น้อง Lonera แมวพันธุ์แท้ โครงสร้างดี', 'author' => 'Baan Meow', 'cat_name' => 'Lonera', 'breed' => 'เปอร์เซีย', 'price' => '12,000 บาท', 'img' => 'cat.png', 'desc' => 'โครงสร้างใหญ่ สุขภาพสมบูรณ์'],
-        ['title' => 'น้อง Lunnavan เปอร์เซียสีขาวนวล น่ากอด', 'author' => 'Baan Meow', 'cat_name' => 'Lunnavan', 'breed' => 'เปอร์เซีย', 'price' => '12,000 บาท', 'img' => 'cat.png', 'desc' => 'กินอาหารเม็ดและอาหารเปียกเก่งมาก']
+        ['cat_id' => 0, 'title' => 'น้องเหมียวตัวน้อยหาบ้านใหม่ สุขภาพแข็งแรง ขี้อ้อนมาก', 'author' => 'CatLover_Official', 'cat_name' => 'ส้มจิ๋ว', 'breed' => 'ไทยแท้', 'price' => 'ฟรี (หาบ้าน)', 'img' => 'cat.png', 'desc' => 'น้องอายุ 2 เดือน กินเก่ง เข้ากระบะทรายเป็นแล้ว'],
+        ['cat_id' => 1, 'title' => 'เปิดรับจองลูกแมว Mochi บริติช ชอร์ตแฮร์แท้', 'author' => 'ฟาร์มแมวเหมียวใจดี', 'cat_name' => 'Mochi', 'breed' => 'บริติช ชอร์ตแฮร์', 'price' => '12,000 บาท', 'img' => 'cat.png', 'desc' => 'น่ารัก ตาโต สุขภาพแข็งแรง ฉีดวัคซีนแล้ว'],
+        ['cat_id' => 2, 'title' => 'น้อง Leo แมวเปอร์เซียขนฟู สีส้มสดใส', 'author' => 'Neko House', 'cat_name' => 'Leo', 'breed' => 'เปอร์เซีย', 'price' => '8,500 บาท', 'img' => 'cat.png', 'desc' => 'ขนยาว นุ่มสลวย ขี้เล่น อารมณ์ดี'],
+        ['cat_id' => 3, 'title' => 'น้อง Luna แมวน้อยสีขาวแต้มส้ม น่ารักเรียบร้อย', 'author' => 'Cat Society', 'cat_name' => 'Luna', 'breed' => 'สก็อตติช โฟลด์', 'price' => '8,500 บาท', 'img' => 'cat.png', 'desc' => 'เรียบร้อย ไม่ดื้อ เลี้ยงในระบบปิด'],
+        ['cat_id' => 4, 'title' => 'น้อง Lonera แมวพันธุ์แท้ โครงสร้างดี', 'author' => 'Baan Meow', 'cat_name' => 'Lonera', 'breed' => 'เปอร์เซีย', 'price' => '12,000 บาท', 'img' => 'cat.png', 'desc' => 'โครงสร้างใหญ่ สุขภาพสมบูรณ์'],
+        ['cat_id' => 5, 'title' => 'น้อง Lunnavan เปอร์เซียสีขาวนวล น่ากอด', 'author' => 'Baan Meow', 'cat_name' => 'Lunnavan', 'breed' => 'เปอร์เซีย', 'price' => '12,000 บาท', 'img' => 'cat.png', 'desc' => 'กินอาหารเม็ดและอาหารเปียกเก่งมาก']
     ];
 
     foreach ($catalog_posts as $post) {
@@ -158,11 +169,11 @@ if ($q !== '') {
 $total_results = count($found_users) + count($found_admins) + count($found_posts);
 ?>
 <!doctype html>
-<html lang="th">
+<html lang="<?= $is_en ? 'en' : 'th' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ผลการค้นหา: <?= htmlspecialchars($q) ?> - Find my meow meow 💖</title>
+    <title><?= $is_en ? 'Search Results: ' : 'ผลการค้นหา: ' ?><?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?> - Find my meow meow 💖</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -188,50 +199,55 @@ $total_results = count($found_users) + count($found_admins) + count($found_posts
 <div class="dashboard-layout">
     <aside class="dash-sidebar">
         <div class="dash-brand">🐾 Find my meow meow</div>
-        <a href="index.php" class="dash-nav-item">🏠 หน้าแรก</a>
-        <a href="profile.php" class="dash-nav-item">👤 ประวัติผู้ใช้งาน</a>
-        <a href="contact.php" class="dash-nav-item">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
-        <a href="buy_cat.php" class="dash-nav-item">🛒 ซื้อแมว</a>
-        <a href="adopter.php" class="dash-nav-item">💬 ติดต่อผู้ขอรับเลี้ยง</a>
-        <a href="settings.php" class="dash-nav-item">⚙️ การตั้งค่า</a>
+        <a href="index.php" class="dash-nav-item"><?= $L['nav_home'] ?? '🏠 หน้าแรก' ?></a>
+        <a href="profile.php" class="dash-nav-item"><?= $L['nav_profile'] ?? '👤 ประวัติผู้ใช้งาน' ?></a>
+        <a href="contact.php" class="dash-nav-item"><?= $L['nav_contact'] ?? '✉️ ติดต่อผู้ประกาศ/แอดมิน' ?></a>
+        <a href="buy_cat.php" class="dash-nav-item"><?= $L['nav_buy'] ?? '🛒 ซื้อแมว' ?></a>
+        <a href="adopter.php" class="dash-nav-item"><?= $L['nav_chat'] ?? '💬 ติดต่อผู้ขอรับเลี้ยง' ?></a>
+        <a href="settings.php" class="dash-nav-item"><?= $L['nav_settings'] ?? '⚙️ การตั้งค่า' ?></a>
         <div style="margin-top: auto;">
-            <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;">🚪 ออกจากระบบ</a>
+            <form action="logout.php" method="POST" style="margin: 0;">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                <button type="submit" class="dash-nav-item" style="width: 100%; background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5; cursor: pointer; font-family: 'Kanit', sans-serif;"><?= $L['nav_logout'] ?? '🚪 ออกจากระบบ' ?></button>
+            </form>
         </div>
     </aside>
 
     <main class="dash-main">
         <!-- แถบค้นหาด้านบน -->
-        <?php include 'config/search.php'; ?>
+        <?php if (file_exists('config/search.php')) include 'config/search.php'; ?>
 
         <div class="filter-tip">
-            💡 <strong>เทคนิคการค้นหาขั้นสูงแบบ Google:</strong>
-            ใส่วลีใน <code>"..."</code> เพื่อค้นหาคำเรียงติดกันเป๊ะๆ | ใส่เครื่องหมายลบ <code>-คำที่ไม่ต้องการ</code> เพื่อตัดผลลัพธ์ทิ้ง | ใช้ <code>คำA OR คำB</code> เพื่อค้นหาอย่างใดอย่างหนึ่ง
+            💡 <strong><?= $is_en ? 'Google-style Advanced Search Tips:' : 'เทคนิคการค้นหาขั้นสูงแบบ Google:' ?></strong>
+            <?= $is_en
+                ? 'Use <code>"..."</code> for exact phrases | Use <code>-word</code> to exclude terms | Use <code>wordA OR wordB</code> to match either term'
+                : 'ใส่วลีใน <code>"..."</code> เพื่อค้นหาคำเรียงติดกันเป๊ะๆ | ใส่เครื่องหมายลบ <code>-คำที่ไม่ต้องการ</code> เพื่อตัดผลลัพธ์ทิ้ง | ใช้ <code>คำA OR คำB</code> เพื่อค้นหาอย่างใดอย่างหนึ่ง' ?>
         </div>
 
         <h2 style="color: #d81b60; margin-top: 0;">
-            🔍 ผลลัพธ์การค้นหา: "<?= htmlspecialchars($q) ?>"
-            <span style="font-size: 15px; color: #888; font-weight: normal;">(พบทั้งหมด <?= $total_results ?> รายการ)</span>
+            🔍 <?= $is_en ? 'Search Results for:' : 'ผลลัพธ์การค้นหา:' ?> "<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>"
+            <span style="font-size: 15px; color: #888; font-weight: normal;">(<?= $is_en ? "Found {$total_results} items" : "พบทั้งหมด {$total_results} รายการ" ?>)</span>
         </h2>
 
         <?php if ($total_results === 0): ?>
             <div style="text-align: center; padding: 50px 20px; background: white; border-radius: 20px; border: 1px solid #ffccd5;">
                 <p style="font-size: 45px; margin: 0;">🐱❓</p>
-                <h3 style="color: #d81b60;">ไม่พบข้อมูลที่ตรงกับคำค้นหาของคุณ</h3>
-                <p style="color: #777; font-size: 14px;">ลองเปลี่ยนคำค้นหาเป็นคำที่สั้นลง หรือใช้คำที่มีความหมายใกล้เคียงกันดูนะครับ</p>
+                <h3 style="color: #d81b60;"><?= $is_en ? 'No matching results found' : 'ไม่พบข้อมูลที่ตรงกับคำค้นหาของคุณ' ?></h3>
+                <p style="color: #777; font-size: 14px;"><?= $is_en ? 'Try shorter keywords or related terms.' : 'ลองเปลี่ยนคำค้นหาเป็นคำที่สั้นลง หรือใช้คำที่มีความหมายใกล้เคียงกันดูนะครับ' ?></p>
             </div>
         <?php else: ?>
 
             <!-- 1. หมวดหมู่แอดมิน (Admin) -->
             <?php if (!empty($found_admins)): ?>
-                <h3 style="color: #1976d2; margin-top: 25px;">🛡️ ผู้ดูแลระบบ (Admins)</h3>
+                <h3 style="color: #1976d2; margin-top: 25px;">🛡️ <?= $is_en ? 'Admins' : 'ผู้ดูแลระบบ (Admins)' ?></h3>
                 <?php foreach ($found_admins as $adm): ?>
                     <div class="result-card">
                         <div style="display: flex; gap: 15px; align-items: center;">
-                            <img src="assets/images/<?= htmlspecialchars($adm['avatar'] ?? 'student.jpg') ?>" onerror="this.src='assets/images/student.jpg';" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #1976d2;">
+                            <img src="assets/images/<?= htmlspecialchars(resolve_img($adm['avatar'] ?? 'student.jpg'), ENT_QUOTES, 'UTF-8') ?>" alt="Admin" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #1976d2;">
                             <div>
-                                <span class="badge badge-admin">แอดมิน</span>
-                                <h4 style="margin: 4px 0; color: #333; font-size: 16px;"><?= htmlspecialchars($adm['full_name']) ?> <small style="color: #888;">(<?= htmlspecialchars($adm['email']) ?>)</small></h4>
-                                <p style="margin: 0; font-size: 13px; color: #666;"><?= htmlspecialchars($adm['bio'] ?? $adm['status'] ?? '') ?></p>
+                                <span class="badge badge-admin"><?= $is_en ? 'Admin' : 'แอดมิน' ?></span>
+                                <h4 style="margin: 4px 0; color: #333; font-size: 16px;"><?= htmlspecialchars($adm['full_name'], ENT_QUOTES, 'UTF-8') ?> <small style="color: #888;">(<?= htmlspecialchars($adm['email'], ENT_QUOTES, 'UTF-8') ?>)</small></h4>
+                                <p style="margin: 0; font-size: 13px; color: #666;"><?= htmlspecialchars($adm['bio'] ?? $adm['status'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
                             </div>
                         </div>
                     </div>
@@ -240,15 +256,15 @@ $total_results = count($found_users) + count($found_admins) + count($found_posts
 
             <!-- 2. หมวดหมู่ชื่อคน / สมาชิก (Users) -->
             <?php if (!empty($found_users)): ?>
-                <h3 style="color: #d81b60; margin-top: 25px;">👤 สมาชิกและผู้ขอรับเลี้ยง (Users)</h3>
+                <h3 style="color: #d81b60; margin-top: 25px;">👤 <?= $is_en ? 'Members & Adopters (Users)' : 'สมาชิกและผู้ขอรับเลี้ยง (Users)' ?></h3>
                 <?php foreach ($found_users as $usr): ?>
                     <div class="result-card">
                         <div style="display: flex; gap: 15px; align-items: center;">
-                            <img src="assets/images/<?= htmlspecialchars($usr['avatar'] ?? 'student.jpg') ?>" onerror="this.src='assets/images/student.jpg';" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff758c;">
+                            <img src="assets/images/<?= htmlspecialchars(resolve_img($usr['avatar'] ?? 'student.jpg'), ENT_QUOTES, 'UTF-8') ?>" alt="User" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid #ff758c;">
                             <div>
-                                <span class="badge badge-user">สมาชิก</span>
-                                <h4 style="margin: 4px 0; color: #333; font-size: 16px;"><?= htmlspecialchars($usr['full_name']) ?> <?php if(!empty($usr['nickname'])): ?><span style="color: #888; font-weight: normal;">(<?= htmlspecialchars($usr['nickname']) ?>)</span><?php endif; ?></h4>
-                                <p style="margin: 0; font-size: 13px; color: #666;">อีเมล: <?= htmlspecialchars($usr['email']) ?> | สถานะ: <?= htmlspecialchars($usr['status'] ?? '-') ?></p>
+                                <span class="badge badge-user"><?= $is_en ? 'Member' : 'สมาชิก' ?></span>
+                                <h4 style="margin: 4px 0; color: #333; font-size: 16px;"><?= htmlspecialchars($usr['full_name'], ENT_QUOTES, 'UTF-8') ?> <?php if (!empty($usr['nickname'])): ?><span style="color: #888; font-weight: normal;">(<?= htmlspecialchars($usr['nickname'], ENT_QUOTES, 'UTF-8') ?>)</span><?php endif; ?></h4>
+                                <p style="margin: 0; font-size: 13px; color: #666;"><?= $is_en ? 'Email:' : 'อีเมล:' ?> <?= htmlspecialchars($usr['email'], ENT_QUOTES, 'UTF-8') ?> | <?= $is_en ? 'Status:' : 'สถานะ:' ?> <?= htmlspecialchars($usr['status'] ?? '-', ENT_QUOTES, 'UTF-8') ?></p>
                             </div>
                         </div>
                     </div>
@@ -257,20 +273,21 @@ $total_results = count($found_users) + count($found_admins) + count($found_posts
 
             <!-- 3. หมวดหมู่ชื่อโพสต์ / ประกาศแมว (Posts) -->
             <?php if (!empty($found_posts)): ?>
-                <h3 style="color: #2e7d32; margin-top: 25px;">🐱 ชื่อโพสต์และประกาศแมว (Posts & Cats)</h3>
+                <h3 style="color: #2e7d32; margin-top: 25px;">🐱 <?= $is_en ? 'Posts & Cat Listings' : 'ชื่อโพสต์และประกาศแมว (Posts & Cats)' ?></h3>
                 <?php foreach ($found_posts as $p): ?>
+                    <?php $detail_url = ($p['cat_id'] > 0) ? 'cat_detail.php?id=' . (int)$p['cat_id'] : 'buy_cat.php'; ?>
                     <div class="result-card">
                         <div style="display: flex; gap: 15px;">
-                            <img src="assets/images/<?= htmlspecialchars($p['img']) ?>" onerror="this.src='assets/images/cat.png';" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;">
+                            <img src="assets/images/<?= htmlspecialchars(resolve_img($p['img'], 'cat.png'), ENT_QUOTES, 'UTF-8') ?>" alt="Cat" style="width: 80px; height: 80px; border-radius: 12px; object-fit: cover;">
                             <div style="flex: 1;">
-                                <span class="badge badge-post">ประกาศ</span>
-                                <h4 style="margin: 4px 0; color: #333; font-size: 16px;"><?= htmlspecialchars($p['title']) ?></h4>
-                                <p style="margin: 2px 0 6px 0; font-size: 13px; color: #555;"><?= htmlspecialchars($p['desc']) ?></p>
-                                <small style="color: #888;">ชื่อน้อง: <strong><?= htmlspecialchars($p['cat_name']) ?></strong> | สายพันธุ์: <?= htmlspecialchars($p['breed']) ?> | ผู้โพสต์: <?= htmlspecialchars($p['author']) ?></small>
+                                <span class="badge badge-post"><?= $is_en ? 'Post' : 'ประกาศ' ?></span>
+                                <h4 style="margin: 4px 0; color: #333; font-size: 16px;"><?= htmlspecialchars($p['title'], ENT_QUOTES, 'UTF-8') ?></h4>
+                                <p style="margin: 2px 0 6px 0; font-size: 13px; color: #555;"><?= htmlspecialchars($p['desc'], ENT_QUOTES, 'UTF-8') ?></p>
+                                <small style="color: #888;"><?= $is_en ? 'Name:' : 'ชื่อน้อง:' ?> <strong><?= htmlspecialchars($p['cat_name'], ENT_QUOTES, 'UTF-8') ?></strong> | <?= $is_en ? 'Breed:' : 'สายพันธุ์:' ?> <?= htmlspecialchars($p['breed'], ENT_QUOTES, 'UTF-8') ?> | <?= $is_en ? 'Author:' : 'ผู้โพสต์:' ?> <?= htmlspecialchars($p['author'], ENT_QUOTES, 'UTF-8') ?></small>
                             </div>
                             <div style="text-align: right; align-self: center;">
-                                <strong style="color: #d81b60; font-size: 15px;"><?= htmlspecialchars($p['price']) ?></strong><br>
-                                <a href="buy_cat.php" style="display: inline-block; margin-top: 6px; padding: 6px 14px; background: #ff758c; color: white; text-decoration: none; border-radius: 12px; font-size: 12px;">ดูรายละเอียด</a>
+                                <strong style="color: #d81b60; font-size: 15px;"><?= htmlspecialchars($p['price'], ENT_QUOTES, 'UTF-8') ?></strong><br>
+                                <a href="<?= $detail_url ?>" style="display: inline-block; margin-top: 6px; padding: 6px 14px; background: #ff758c; color: white; text-decoration: none; border-radius: 12px; font-size: 12px;"><?= $is_en ? 'View Details' : 'ดูรายละเอียด' ?></a>
                             </div>
                         </div>
                     </div>

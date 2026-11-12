@@ -1,7 +1,10 @@
 <?php
-// ตำแหน่งไฟล์: login/config/search.php
+// ตำแหน่งไฟล์: login/config/search.php (Pure PHP ไม่มี JavaScript)
 $search_query = isset($_GET['q']) ? htmlspecialchars(trim($_GET['q']), ENT_QUOTES, 'UTF-8') : '';
-$current_avatar = !empty($current_user['avatar']) ? $current_user['avatar'] : (!empty($_SESSION['avatar']) ? $_SESSION['avatar'] : 'student.jpg');
+$raw_avatar = !empty($current_user['avatar']) ? $current_user['avatar'] : (!empty($_SESSION['avatar']) ? $_SESSION['avatar'] : 'student.jpg');
+$avatar_path = __DIR__ . '/../assets/images/' . basename($raw_avatar);
+$current_avatar = is_file($avatar_path) ? basename($raw_avatar) : 'student.jpg';
+
 $default_name = $L['default_user'] ?? 'ผู้ใช้งาน';
 $current_name = !empty($current_user['full_name']) ? $current_user['full_name'] : (!empty($_SESSION['full_name']) ? $_SESSION['full_name'] : $default_name);
 
@@ -19,7 +22,7 @@ $notif_title = $L['notif_title'] ?? 'การแจ้งเตือน';
     <div style="display: flex; align-items: center; gap: 18px;">
         <span style="font-size: 20px; cursor: pointer; color: #e57373;" title="<?= htmlspecialchars($notif_title, ENT_QUOTES, 'UTF-8') ?>">🔔</span>
         <a href="profile.php" style="display: flex; align-items: center; gap: 10px; text-decoration: none;">
-            <img src="assets/images/<?= htmlspecialchars($current_avatar, ENT_QUOTES, 'UTF-8') ?>" onerror="this.src='assets/images/student.jpg';" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #ff758c;">
+            <img src="assets/images/<?= htmlspecialchars($current_avatar, ENT_QUOTES, 'UTF-8') ?>" alt="Avatar" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #ff758c;">
             <strong style="font-size: 14px; color: #333;"><?= htmlspecialchars($current_name, ENT_QUOTES, 'UTF-8') ?></strong>
         </a>
     </div>

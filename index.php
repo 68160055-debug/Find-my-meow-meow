@@ -7,13 +7,17 @@ date_default_timezone_set('Asia/Bangkok');
 
 require_once 'auth.php';
 require_once 'config/db.php';
-require_once 'config/lang.php'; // เพิ่มบรรทัดนี้
+if (file_exists('config/lang.php')) {
+    require_once 'config/lang.php';
+}
 require_login();
 
 $user_id = $_SESSION['user_id'];
+$is_en = (($_SESSION['site_lang'] ?? 'th') === 'en');
 
 // 1. รับค่าและบันทึกโพสต์ใหม่ด้วยเพียว PHP (เก็บลงใน Session เพื่อแสดงผลทันที)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['post_content'])) {
+    check_auth_token();
     $content = trim((string)$_POST['post_content']);
     if ($content !== '') {
         if (!isset($_SESSION['user_posts'])) {
@@ -28,10 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['post_content'])) {
 
         // บันทึกโพสต์ใหม่ไว้บนสุดของฟีด
         array_unshift($_SESSION['user_posts'], [
-            'author' => $author_data['full_name'] ?? 'ผู้ใช้งาน',
+            'author' => $author_data['full_name'] ?? ($is_en ? 'User' : 'ผู้ใช้งาน'),
             'avatar' => !empty($author_data['avatar']) ? $author_data['avatar'] : 'student.jpg',
             'content' => $content,
-            'time' => 'เมื่อสักครู่'
+            'time' => $is_en ? 'Just now' : 'เมื่อสักครู่'
         ]);
 
         header("Location: index.php");
@@ -49,11 +53,11 @@ $stmt->close();
 $avatar_img = !empty($current_user['avatar']) ? $current_user['avatar'] : 'student.jpg';
 ?>
 <!doctype html>
-<html lang="th">
+<html lang="<?= $is_en ? 'en' : 'th' ?>">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>หน้าแรก - Find my meow meow 💖</title>
+    <title><?= $is_en ? 'Home - Find my meow meow 💖' : 'หน้าแรก - Find my meow meow 💖' ?></title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -81,18 +85,21 @@ $avatar_img = !empty($current_user['avatar']) ? $current_user['avatar'] : 'stude
 
 <div class="dashboard-layout">
     <!-- 1. แถบเมนูด้านซ้าย -->
-   <aside class="dash-sidebar">
-    <div class="dash-brand">🐾 Find my meow meow</div>
-    <a href="index.php" class="dash-nav-item active"><?= $L['nav_home'] ?></a>
-    <a href="profile.php" class="dash-nav-item"><?= $L['nav_profile'] ?></a>
-    <a href="contact.php" class="dash-nav-item"><?= $L['nav_contact'] ?></a>
-    <a href="buy_cat.php" class="dash-nav-item"><?= $L['nav_buy'] ?></a>
-    <a href="adopter.php" class="dash-nav-item"><?= $L['nav_chat'] ?></a>
-    <a href="settings.php" class="dash-nav-item"><?= $L['nav_settings'] ?></a>
-    <div style="margin-top: auto;">
-        <a href="logout.php" class="dash-nav-item" style="background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5;"><?= $L['nav_logout'] ?></a>
-    </div>
-</aside>
+    <aside class="dash-sidebar">
+        <div class="dash-brand">🐾 Find my meow meow</div>
+        <a href="index.php" class="dash-nav-item active"><?= $L['nav_home'] ?? '🏠 หน้าแรก' ?></a>
+        <a href="profile.php" class="dash-nav-item"><?= $L['nav_profile'] ?? '👤 ประวัติผู้ใช้งาน' ?></a>
+        <a href="contact.php" class="dash-nav-item"><?= $L['nav_contact'] ?? '✉️ ติดต่อผู้ประกาศ/แอดมิน' ?></a>
+        <a href="buy_cat.php" class="dash-nav-item"><?= $L['nav_buy'] ?? '🛒 ซื้อแมว' ?></a>
+        <a href="adopter.php" class="dash-nav-item"><?= $L['nav_chat'] ?? '💬 ติดต่อผู้ขอรับเลี้ยง' ?></a>
+        <a href="settings.php" class="dash-nav-item"><?= $L['nav_settings'] ?? '⚙️ การตั้งค่า' ?></a>
+        <div style="margin-top: auto;">
+            <form action="logout.php" method="POST" style="margin: 0;">
+                <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                <button type="submit" class="dash-nav-item" style="width: 100%; background: #fff0f3; color: #d81b60; border: 1px solid #ffccd5; cursor: pointer; font-family: 'Kanit', sans-serif;"><?= $L['nav_logout'] ?? '🚪 ออกจากระบบ' ?></button>
+            </form>
+        </div>
+    </aside>
 
     <!-- 2. พื้นที่ตรงกลาง (Main Content) -->
     <main class="dash-main">
@@ -101,10 +108,11 @@ $avatar_img = !empty($current_user['avatar']) ? $current_user['avatar'] : 'stude
 
         <!-- กล่องแชร์โพสต์ -->
         <form method="POST" action="index.php" class="post-box">
+            <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
             <div class="post-input-row">
-                <img src="assets/images/<?= htmlspecialchars($avatar_img) ?>" onerror="this.src='assets/images/student.jpg';" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover;">
-                <input type="text" name="post_content" required placeholder="คุณอยากแชร์เรื่องราวอะไรเกี่ยวกับน้องแมววันนี้..." autocomplete="off">
-                <button type="submit" class="btn-post">แชร์โพสต์</button>
+                <img src="assets/images/<?= htmlspecialchars($avatar_img, ENT_QUOTES, 'UTF-8') ?>" onerror="this.src='assets/images/student.jpg';" style="width: 42px; height: 42px; border-radius: 50%; object-fit: cover;">
+                <input type="text" name="post_content" required placeholder="<?= $is_en ? 'What story about cats would you like to share today...' : 'คุณอยากแชร์เรื่องราวอะไรเกี่ยวกับน้องแมววันนี้...' ?>" autocomplete="off">
+                <button type="submit" class="btn-post"><?= $is_en ? 'Share Post' : 'แชร์โพสต์' ?></button>
             </div>
         </form>
 
@@ -114,20 +122,20 @@ $avatar_img = !empty($current_user['avatar']) ? $current_user['avatar'] : 'stude
                 <div class="feed-card">
                     <div class="feed-header">
                         <div class="feed-user-info">
-                            <img src="assets/images/<?= htmlspecialchars($p['avatar']) ?>" onerror="this.src='assets/images/student.jpg';">
+                            <img src="assets/images/<?= htmlspecialchars($p['avatar'], ENT_QUOTES, 'UTF-8') ?>" onerror="this.src='assets/images/student.jpg';">
                             <div>
-                                <strong style="font-size: 15px; color: #333;"><?= htmlspecialchars($p['author']) ?></strong>
-                                <div style="font-size: 12px; color: #888;"><?= htmlspecialchars($p['time']) ?></div>
+                                <strong style="font-size: 15px; color: #333;"><?= htmlspecialchars($p['author'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                <div style="font-size: 12px; color: #888;"><?= htmlspecialchars($p['time'], ENT_QUOTES, 'UTF-8') ?></div>
                             </div>
                         </div>
                     </div>
                     <p style="font-size: 14px; line-height: 1.6; color: #333; margin: 10px 0;">
-                        <?= htmlspecialchars($p['content']) ?>
+                        <?= htmlspecialchars($p['content'], ENT_QUOTES, 'UTF-8') ?>
                     </p>
                     <div class="post-actions">
-                        <button type="button" class="act-btn">💖 ถูกใจ (0)</button>
-                        <button type="button" class="act-btn">💬 คอมเมนต์ (0)</button>
-                        <button type="button" class="act-btn">🔗 แชร์ลิงก์</button>
+                        <button type="button" class="act-btn"><?= $is_en ? '💖 Like (0)' : '💖 ถูกใจ (0)' ?></button>
+                        <button type="button" class="act-btn"><?= $is_en ? '💬 Comment (0)' : '💬 คอมเมนต์ (0)' ?></button>
+                        <button type="button" class="act-btn"><?= $is_en ? '🔗 Share' : '🔗 แชร์ลิงก์' ?></button>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -140,25 +148,25 @@ $avatar_img = !empty($current_user['avatar']) ? $current_user['avatar'] : 'stude
                     <img src="assets/images/student.jpg" alt="User Avatar">
                     <div>
                         <strong style="font-size: 15px; color: #333;">CatLover_Official 🐾</strong>
-                        <div style="font-size: 12px; color: #888;">2 ชั่วโมงที่แล้ว</div>
+                        <div style="font-size: 12px; color: #888;"><?= $is_en ? '2 hours ago' : '2 ชั่วโมงที่แล้ว' ?></div>
                     </div>
                 </div>
-                <button type="button" style="background:#ff758c; color:white; border:none; padding:6px 14px; border-radius:12px; font-size:12px; cursor:pointer;">+ ติดตาม</button>
+                <button type="button" style="background:#ff758c; color:white; border:none; padding:6px 14px; border-radius:12px; font-size:12px; cursor:pointer;"><?= $is_en ? '+ Follow' : '+ ติดตาม' ?></button>
             </div>
             <p style="font-size: 14px; line-height: 1.6; color: #333;">
                 น้องเหมียวตัวน้อยหาบ้านใหม่ครับ! น้องอายุ 2 เดือน สุขภาพแข็งแรง ขี้อ้อนมาก กินเก่ง ขับถ่ายในกระบะทรายเป็นแล้วครับ ท่านใดสนใจรับเลี้ยงติดต่อได้เลยครับ 💖🐾
             </p>
             <img src="assets/images/cat.png" onerror="this.src='assets/images/student.jpg';" style="width: 100%; max-height: 350px; border-radius: 14px; object-fit: cover; margin-top: 8px;">
             <div class="post-actions">
-                <button type="button" class="act-btn">💖 ถูกใจ (24)</button>
-                <button type="button" class="act-btn">💬 คอมเมนต์ (5)</button>
-                <button type="button" class="act-btn">🔗 แชร์ลิงก์</button>
+                <button type="button" class="act-btn"><?= $is_en ? '💖 Like (24)' : '💖 ถูกใจ (24)' ?></button>
+                <button type="button" class="act-btn"><?= $is_en ? '💬 Comment (5)' : '💬 คอมเมนต์ (5)' ?></button>
+                <button type="button" class="act-btn"><?= $is_en ? '🔗 Share' : '🔗 แชร์ลิงก์' ?></button>
             </div>
         </div>
     </main>
 
     <!-- 3. แถบขวามือ: รวมปฏิทินและเวลามาตรฐานเดียวกับทุกหน้า -->
-    <?php include 'config/rightbar.php'; ?>
+    <?php if (file_exists('config/rightbar.php')) include 'config/rightbar.php'; ?>
 </div>
 </body>
 </html>

@@ -8,27 +8,61 @@
         <a href="profile.php" class="btn-view-profile">ดูโปรไฟล์ของฉัน →</a>
     </div>
 
-    <!-- ปฏิทิน มกราคม 2026 -->
-    <div class="widget-card calendar-card">
-        <div class="calendar-header">
-            <h4>📅 มกราคม 2026</h4>
-            <span class="cal-nav">›</span>
-        </div>
-        <table class="calendar-table">
-            <thead>
+    <!-- แถบปฏิทินด้านขวา -->
+    <aside class="dash-right">
+        <div class="widget-box">
+            <?php
+            $month_name = $L['months'][$month];
+            $display_year = ($current_lang === 'en') ? $year : ($year + 543);
+            ?>
+            <h4 style="margin: 0 0 10px 0; color: #d81b60;">📅 <?= $month_name ?> <?= $display_year ?></h4>
+            <table class="calendar-table">
                 <tr>
-                    <th>อา.</th><th>จ.</th><th>อ.</th><th>พ.</th><th>พฤ.</th><th>ศ.</th><th>ส.</th>
+                    <?php foreach ($L['days'] as $day_name): ?>
+                        <th><?= $day_name ?></th>
+                    <?php endforeach; ?>
                 </tr>
-            </thead>
-            <tbody>
-                <tr><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td></tr>
-                <tr><td>8</td><td>9</td><td>10</td><td><span class="cal-active">11</span></td><td>12</td><td>13</td><td>14</td></tr>
-                <tr><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td><td>21</td></tr>
-                <tr><td>22</td><td>23</td><td>24</td><td>25</td><td>26</td><td>27</td><td>28</td></tr>
-                <tr><td>29</td><td>30</td><td>31</td><td></td><td></td><td></td><td></td></tr>
-            </tbody>
-        </table>
-    </div>
+                <tr>
+                <?php
+                $current_day = 1;
+                $today_d = (int)date('j');
+                $today_m = (int)date('n');
+                $today_y = (int)date('Y');
+                for ($i = 0; $i < 42; $i++) {
+                    if ($i >= $first_day_of_week && $current_day <= $days_in_month) {
+                        $is_today = ($current_day == $today_d && $month == $today_m && $year == $today_y);
+                        if ($is_today) echo "<td><span class='cal-today'>{$current_day}</span></td>";
+                        else echo "<td style='color:#555;'>{$current_day}</td>";
+                        $current_day++;
+                    } else {
+                        echo "<td></td>";
+                    }
+                    if ($i % 7 == 6) echo "</tr><tr>";
+                }
+                ?>
+                </tr>
+            </table>
+        </div>
+    </aside>
+</div>
+</body>
+</html>
+<?php
+// คำนวณเวลาปัจจุบันด้วย Pure PHP (ไม่ใช้ JavaScript)
+$tz_th = (new DateTime('now', new DateTimeZone('Asia/Bangkok')))->format('H:i');
+$tz_jp = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('H:i');
+$tz_us = (new DateTime('now', new DateTimeZone('America/New_York')))->format('H:i');
+$tz_uk = (new DateTime('now', new DateTimeZone('Europe/London')))->format('H:i');
+?>
+<div class="widget-box" style="text-align: left;">
+    <h4 style="font-size: 13px; color: #d81b60; margin: 0 0 8px 0;">🕒 เวลาปัจจุบันตามประเทศ</h4>
+    <ul class="world-time-list">
+        <li class="world-time-item"><span>TH ไทย (UTC+7)</span> <strong><?= $tz_th ?></strong></li>
+        <li class="world-time-item"><span>JP ญี่ปุ่น (UTC+9)</span> <strong><?= $tz_jp ?></strong></li>
+        <li class="world-time-item"><span>US สหรัฐฯ (UTC-4/5)</span> <strong><?= $tz_us ?></strong></li>
+        <li class="world-time-item"><span>GB สหราชอาณาจักร</span> <strong><?= $tz_uk ?></strong></li>
+    </ul>
+</div>
 
     <!-- สถิติการใช้งาน -->
     <div class="widget-card stats-card">
