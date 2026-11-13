@@ -194,8 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_adopter_form']
     }
 }
 
-// 3. เพิ่มเพื่อนในระบบแชท
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_friend']) && $existing_app) {
+// 3. เพิ่มเพื่อนในระบบแชท (รองรับผู้ใช้งานทุกคนทั้ง 2 ฝั่ง)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_friend'])) {
     check_auth_token();
     $target_id = (int)($_POST['friend_id'] ?? 0);
     if ($target_id > 0 && $target_id !== $user_id) {
@@ -208,8 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_friend']) && $exi
     }
 }
 
-// 4. ยืนยันยกเลิกข้อความ (Unsend)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_unsend_msg']) && $existing_app) {
+// 4. ยืนยันยกเลิกข้อความ (Unsend - รองรับผู้ใช้งานทุกคนทั้ง 2 ฝั่ง)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_unsend_msg'])) {
     check_auth_token();
     $msg_id    = (int)($_POST['msg_id'] ?? 0);
     $friend_id = (int)($_POST['friend_id'] ?? 0);
@@ -223,22 +223,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_unsend_msg'])
     exit();
 }
 
-// 5. ส่งข้อความที่พิมพ์เอง / สติกเกอร์ / รูปภาพ / วิดีโอ / เอกสาร
+// 5. ส่งข้อความที่พิมพ์เอง / สติกเกอร์ / รูปภาพ / วิดีโอ / เอกสาร (รองรับผู้ใช้งานทุกคนทั้ง 2 ฝั่ง)
 $active_friend_id = (int)($_GET['friend_id'] ?? ($_POST['friend_id'] ?? 0));
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isset($_POST['send_sticker']) || isset($_POST['message_text'])) && $existing_app) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isset($_POST['send_sticker']) || isset($_POST['message_text']))) {
     check_auth_token();
     $friend_id = (int)($_POST['friend_id'] ?? 0);
 
-    // ตรวจสอบว่าเป็นเพื่อนกันจริงหรือไม่
+    // ตรวจสอบว่าเป็นเพื่อนกันหรือไม่ ถ้ายังไม่ได้เพิ่มเพื่อนแต่ส่งหากัน ระบบจะผูกความเป็นเพื่อนให้อัตโนมัติหากมีประวัติแชท หรือบังคับเพิ่มเพื่อนก่อน
     $fchk = $conn->prepare("SELECT id FROM adopter_friends WHERE user_id = ? AND friend_id = ? LIMIT 1");
     $fchk->bind_param("ii", $user_id, $friend_id);
     $fchk->execute();
     $is_friend = (bool)$fchk->get_result()->fetch_assoc();
     $fchk->close();
 
+    if (!$is_friend && $friend_id > 0 && $friend_id !== $user_id) {
+        // ตรวจสอบว่าอีกฝั่งมีตัวตนในตาราง users จริงหรือไม่
+        $uchk = $conn->prepare("SELECT id FROM users WHERE id = ? LIMIT 1");
+        $uchk->bind_param("i", $friend_id);
+        $uchk->execute();
+        if ($uchk->get_result()->fetch_assoc()) {
+            $add_auto = $conn->prepare("INSERT IGNORE INTO adopter_friends (user_id, friend_id) VALUES (?, ?), (?, ?)");
+            $add_auto->bind_param("iiii", $user_id, $friend_id, $friend_id, $user_id);
+            $add_auto->execute();
+            $add_auto->close();
+            $is_friend = true;
+        }
+        $uchk->close();
+    }
+
     if (!$is_friend) {
-        $error = '⚠️ กรุณาเพิ่มเพื่อนก่อนเริ่มส่งข้อความ';
+        $error = '⚠️ กรุณาเลือกเพื่อนก่อนเริ่มส่งข้อความ';
     } elseif (isset($_POST['send_sticker'])) {
         $sticker_val = trim((string)($_POST['send_sticker'] ?? ''));
         $allowed_stickers = [
@@ -348,13 +363,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isse
     }
 }
 
+// ตรวจสอบว่าผู้ใช้เคยมีเพื่อนหรือข้อความแชทในระบบหรือยัง (เพื่ออำนวยความสะดวกให้ฝั่งผู้ประกาศเข้าแชทได้เลย)
+$has_chat_chk = $conn->prepare("SELECT 1 FROM adopter_friends WHERE user_id = ? LIMIT 1");
+$has_chat_chk->bind_param("i", $user_id);
+$has_chat_chk->execute();
+$has_any_friends = (bool)$has_chat_chk->get_result()->fetch_assoc();
+$has_chat_chk->close();
+
 // กำหนดหน้าแสดงผลปัจจุบัน
+$requested_view = $_GET['view'] ?? '';
 $step = (!empty($_SESSION['adopter_pdpa_ok']) && ($_GET['step'] ?? '') === 'form') ? 'form' : 'pdpa';
+
 if (isset($_GET['submitted'])) {
     $step = 'done';
+} elseif ($requested_view === 'friends' || isset($_GET['friend_id']) || isset($_GET['q'])) {
+    // อนุญาตให้ผู้ใช้งานทุกคน (ทั้งฝั่งผู้รับเลี้ยง และฝั่งผู้ประกาศ/คนอื่น) เข้าหน้าแชทได้ทันที
+    $step = 'friends';
 } elseif ($existing_app) {
-    $view = $_GET['view'] ?? 'rules';
-    $step = ($view === 'friends') ? 'friends' : 'rules';
+    $step = ($requested_view === 'friends') ? 'friends' : 'rules';
+} elseif ($has_any_friends && ($_GET['step'] ?? '') !== 'pdpa' && ($_GET['step'] ?? '') !== 'form') {
+    // หากยังไม่ได้สมัครเป็นผู้รับเลี้ยง แต่มีคนทักแชทมาหาแล้ว ให้เปิดหน้าแชทให้อัตโนมัติ
+    $step = 'friends';
 }
 
 // โหลดข้อมูลสำหรับหน้าแชท/ค้นหาเพื่อน
@@ -368,12 +397,15 @@ $view_media_id = (int)($_GET['view_media'] ?? 0);
 $active_media_item = null;
 
 if ($step === 'friends') {
-    $fl_stmt = $conn->prepare("SELECT u.id, u.full_name, u.nickname, u.avatar
+    // รายชื่อเพื่อนทั้งหมด (เรียงตามข้อความล่าสุด เพื่อให้เห็นคนที่ทักมาใหม่บนสุด)
+    $fl_stmt = $conn->prepare("SELECT u.id, u.full_name, u.nickname, u.avatar,
+        (SELECT MAX(m.created_at) FROM adopter_messages m
+         WHERE (m.sender_id = ? AND m.receiver_id = u.id) OR (m.sender_id = u.id AND m.receiver_id = ?)) AS last_msg_time
         FROM adopter_friends af
         JOIN users u ON u.id = af.friend_id
         WHERE af.user_id = ?
-        ORDER BY u.full_name ASC");
-    $fl_stmt->bind_param("i", $user_id);
+        ORDER BY last_msg_time DESC, u.full_name ASC");
+    $fl_stmt->bind_param("iii", $user_id, $user_id, $user_id);
     $fl_stmt->execute();
     $friends_list = $fl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $fl_stmt->close();
@@ -403,6 +435,19 @@ if ($step === 'friends') {
                 break;
             }
         }
+        // กรณีกดลิงก์ตรง ?view=friends&friend_id=XX มาจากหน้าประกาศแมว แม้ยังไม่เคยเพิ่มเพื่อน ก็ให้ดึงข้อมูลคู่สนทนาขึ้นมาคุยได้เลย
+        if (!$active_friend && $active_friend_id !== $user_id) {
+            $df_stmt = $conn->prepare("SELECT id, full_name, nickname, avatar FROM users WHERE id = ? LIMIT 1");
+            $df_stmt->bind_param("i", $active_friend_id);
+            $df_stmt->execute();
+            $direct_user = $df_stmt->get_result()->fetch_assoc();
+            $df_stmt->close();
+            if ($direct_user) {
+                $active_friend = $direct_user;
+                array_unshift($friends_list, $direct_user);
+            }
+        }
+
         if ($active_friend) {
             $m_stmt = $conn->prepare("SELECT m.*, u.full_name AS sender_name
                 FROM adopter_messages m
@@ -414,7 +459,6 @@ if ($step === 'friends') {
             $chat_messages = $m_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $m_stmt->close();
 
-            // ตรวจสอบว่ามีการคลิกเปิดดูรูปภาพหรือวิดีโอแบบเต็มจอหรือไม่
             if ($view_media_id > 0) {
                 foreach ($chat_messages as $cm) {
                     if ((int)$cm['id'] === $view_media_id && empty($cm['is_unsent']) && in_array($cm['attachment_type'], ['image', 'video'], true) && !empty($cm['attachment_path'])) {
@@ -429,12 +473,12 @@ if ($step === 'friends') {
 
 $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'มีนาคม',4=>'เมษายน',5=>'พฤษภาคม',6=>'มิถุนายน',7=>'กรกฎาคม',8=>'สิงหาคม',9=>'กันยายน',10=>'ตุลาคม',11=>'พฤศจิกายน',12=>'ธันวาคม'];
 $app_fullname = trim(($existing_app['firstname'] ?? '') . ' ' . ($existing_app['lastname'] ?? ''));
-$app_status_raw = $existing_app['application_status'] ?? 'pending';
+$app_status_raw = $existing_app['application_status'] ?? '';
 $app_status_label = [
     'pending'  => '⏳ รอการพิจารณาจากผู้ประกาศ/ผู้ดูแลระบบ (Pending)',
     'approved' => '✅ ผ่านการสมัครเป็นผู้รับเลี้ยงแมว (Approved)',
     'rejected' => '❌ ไม่ผ่านการพิจารณา (Rejected)'
-][$app_status_raw] ?? $app_status_raw;
+][$app_status_raw] ?? '💬 ผู้ใช้งานทั่วไป / ผู้ประกาศหาบ้านให้แมว';
 ?>
 <!doctype html>
 <html lang="th">
@@ -606,7 +650,8 @@ $app_status_label = [
             <a href="profile.php" class="nav-link">👤 ประวัติผู้ใช้งาน</a>
             <a href="contact.php" class="nav-link">✉️ ติดต่อผู้ประกาศ/แอดมิน</a>
             <a href="buy_cat.php" class="nav-link">🛒 ซื้อแมว</a>
-            <a href="adopter.php" class="nav-link active">💬 สมัครเป็นผู้รับเลี้ยงและติดต่อผ่านแชท</a>
+            <a href="adopter.php" class="nav-link <?= $step !== 'friends' ? 'active' : '' ?>">📝 สมัครเป็นผู้รับเลี้ยงแมว</a>
+            <a href="adopter.php?view=friends" class="nav-link <?= $step === 'friends' ? 'active' : '' ?>">💬 ห้องแชทและเพิ่มเพื่อน</a>
             <a href="settings.php" class="nav-link">⚙️ การตั้งค่า</a>
         </div>
         <form method="POST" action="logout.php" style="margin-top:16px;">
@@ -626,13 +671,21 @@ $app_status_label = [
                     <div style="font-size:40px; margin-bottom:8px;">💖🐾</div>
                     <strong>สมัครเป็นผู้รับเลี้ยงเรียบร้อยแล้ว โปรดรอการพิจารณาจากผู้ประกาศ/ผู้ดูแลระบบอีกครั้ง</strong><br>
                     <span style="font-size:13px; color:#2e7d32;">สถานะคำขอปัจจุบัน: <?= htmlspecialchars($app_status_label, ENT_QUOTES, 'UTF-8') ?></span>
-                    <div style="margin-top:18px;">
+                    <div style="margin-top:18px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
                         <a href="adopter.php" style="display:inline-block; background:#d81b60; color:#fff; padding:10px 26px; border-radius:20px; text-decoration:none; font-weight:600;">เข้าสู่หน้าผู้รับเลี้ยง (Adopter) →</a>
+                        <a href="adopter.php?view=friends" style="display:inline-block; background:#2e7d32; color:#fff; padding:10px 26px; border-radius:20px; text-decoration:none; font-weight:600;">💬 ไปที่ห้องแชท →</a>
                     </div>
                 </div>
             </div>
 
         <?php elseif ($step === 'pdpa'): ?>
+            <div class="status-banner" style="background:#e8f5e9; border-color:#a5d6a7;">
+                <div>
+                    <strong>ต้องการพูดคุยหรือตอบแชทกับผู้รับเลี้ยง/ผู้ประกาศ?</strong> (สามารถเข้าใช้งานห้องแชทได้ทันทีโดยไม่ต้องสมัครผู้รับเลี้ยง)
+                </div>
+                <a href="adopter.php?view=friends" style="background:#2e7d32; color:#fff; padding:7px 18px; border-radius:18px; text-decoration:none; font-weight:600;">💬 เข้าสู่ห้องแชททันที →</a>
+            </div>
+
             <div class="card-box">
                 <h2 class="reg-title" style="color:#d81b60;">🔒 ประกาศความเป็นส่วนตัว (Privacy Notice)</h2>
                 <p class="reg-sub">ตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA)</p>
@@ -807,10 +860,14 @@ $app_status_label = [
         <?php else: /* $step === 'friends' */ ?>
             <div class="status-banner">
                 <div>
-                    <strong>สถานะผู้รับเลี้ยงของคุณ (<?= htmlspecialchars($app_fullname ?: $my_display_name, ENT_QUOTES, 'UTF-8') ?>):</strong>
+                    <strong>สถานะของคุณ (<?= htmlspecialchars($app_fullname ?: $my_display_name, ENT_QUOTES, 'UTF-8') ?>):</strong>
                     <?= htmlspecialchars($app_status_label, ENT_QUOTES, 'UTF-8') ?>
                 </div>
-                <a href="adopter.php?view=rules" style="color:#d81b60; text-decoration:none; font-weight:600;">← ย้อนกลับไปอ่านเงื่อนไขผู้รับเลี้ยง</a>
+                <?php if ($existing_app): ?>
+                    <a href="adopter.php?view=rules" style="color:#d81b60; text-decoration:none; font-weight:600;">← ย้อนกลับไปอ่านเงื่อนไขผู้รับเลี้ยง</a>
+                <?php else: ?>
+                    <a href="adopter.php?step=pdpa" style="color:#d81b60; text-decoration:none; font-weight:600;">📝 สมัครเป็นผู้รับเลี้ยงแมว →</a>
+                <?php endif; ?>
             </div>
 
             <div class="card-box">
@@ -818,7 +875,7 @@ $app_status_label = [
                 <form method="GET" action="adopter.php" class="search-bar">
                     <input type="hidden" name="view" value="friends">
                     <span>🔍</span>
-                    <input type="text" name="q" value="<?= htmlspecialchars($search_query, ENT_QUOTES, 'UTF-8') ?>" placeholder="ค้นหาชื่อเพื่อนเพื่อเพิ่มเพื่อนและแชท (เช่น พิมพ์ขึ้นต้นว่า ศิ)...">
+                    <input type="text" name="q" value="<?= htmlspecialchars($search_query, ENT_QUOTES, 'UTF-8') ?>" placeholder="ค้นหาชื่อเพื่อนเพื่อเพิ่มเพื่อนและแชท (เช่น พิมพ์ชื่อผู้ประกาศ หรือผู้รับเลี้ยง)...">
                     <button type="submit" class="search-btn">ค้นหา</button>
                 </form>
 
@@ -859,12 +916,12 @@ $app_status_label = [
                     <div style="text-align:center; padding:45px 20px; color:#777;">
                         <div style="font-size:48px; margin-bottom:10px;">😺💬</div>
                         <h3 style="color:#d81b60; margin:0 0 8px 0;">ยังไม่มีรายชื่อเพื่อนในแชท</h3>
-                        <p style="margin:0; font-size:14px;">พิมพ์ชื่อในช่องค้นหาด้านบน (เช่น "ศิ") แล้วกดปุ่ม <strong>+ เพิ่มเพื่อน</strong> เพื่อเริ่มพูดคุยได้เลยค่ะ</p>
+                        <p style="margin:0; font-size:14px;">พิมพ์ชื่อในช่องค้นหาด้านบน แล้วกดปุ่ม <strong>+ เพิ่มเพื่อน</strong> เพื่อเริ่มพูดคุยได้เลยค่ะ</p>
                     </div>
                 <?php else: ?>
                     <div class="chat-shell">
                         <div class="friends-panel">
-                            <div style="font-weight:600; color:#d81b60; margin-bottom:10px; font-size:14px;">💬 รายชื่อเพื่อนของคุณ</div>
+                            <div style="font-weight:600; color:#d81b60; margin-bottom:10px; font-size:14px;">💬 รายชื่อคู่สนทนาของคุณ</div>
                             <?php foreach ($friends_list as $fr): ?>
                                 <?php $is_act = ((int)$fr['id'] === $active_friend_id); ?>
                                 <a href="adopter.php?view=friends&friend_id=<?= (int)$fr['id'] ?>" class="friend-item <?= $is_act ? 'active' : '' ?>">
@@ -910,7 +967,7 @@ $app_status_label = [
                                 <div class="chat-messages">
                                     <?php if (empty($chat_messages)): ?>
                                         <div style="text-align:center; color:#999; margin:auto; font-size:13.5px;">
-                                            เริ่มทักทาย <?= htmlspecialchars($active_friend['full_name'], ENT_QUOTES, 'UTF-8') ?> ได้เลยค่ะ 🐾
+                                            เริ่มพิมพ์ข้อความทักทาย <?= htmlspecialchars($active_friend['full_name'], ENT_QUOTES, 'UTF-8') ?> ได้เลยค่ะ 🐾
                                         </div>
                                     <?php else: ?>
                                         <?php $last_date = ''; ?>
@@ -972,7 +1029,7 @@ $app_status_label = [
                                     <?php endif; ?>
                                 </div>
 
-                                <!-- ฟอร์มพิมพ์และส่งข้อความ -->
+                                <!-- ฟอร์มพิมพ์และส่งข้อความ (พิมพ์ข้อความอะไรก็ได้ทั้ง 2 ฝั่ง) -->
                                 <form method="POST" action="adopter.php?view=friends&friend_id=<?= (int)$active_friend_id ?>" enctype="multipart/form-data" class="chat-compose">
                                     <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                                     <input type="hidden" name="friend_id" value="<?= (int)$active_friend_id ?>">
@@ -997,7 +1054,7 @@ $app_status_label = [
                                         </label>
 
                                         <!-- ช่องพิมพ์ข้อความเอง -->
-                                        <input type="text" name="message_text" class="compose-input" placeholder="พิมพ์ข้อความ หรือวางลิงก์ Google Drive / Canva..." autocomplete="off">
+                                        <input type="text" name="message_text" class="compose-input" placeholder="พิมพ์ข้อความอะไรก็ได้ที่นี่..." autocomplete="off">
 
                                         <!-- 4. ปุ่มสติกเกอร์ -->
                                         <details class="sticker-picker">
