@@ -37,7 +37,7 @@ $conn->query("CREATE TABLE IF NOT EXISTS adopter_messages (
     CONSTRAINT fk_am_receiver FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-// ฟังก์ชันช่วยแปลงขนาดจาก php.ini เป็น Byte (เช่น 2M -> 2097152)
+// ฟังก์ชันช่วยแปลงขนาดจาก php.ini เป็น Byte
 function php_size_to_bytes(string $val): int {
     $val = trim($val);
     if ($val === '') {
@@ -85,9 +85,9 @@ $server_upload_max = php_size_to_bytes((string)ini_get('upload_max_filesize'));
 $server_post_max   = php_size_to_bytes((string)ini_get('post_max_size'));
 $server_limit      = min($server_upload_max, $server_post_max);
 
-$max_image_bytes = min(2 * 1024 * 1024, $server_limit); // รูปภาพสูงสุด 2 MB
-$max_doc_bytes   = min(5 * 1024 * 1024, $server_limit); // เอกสารสูงสุด 5 MB (หรือตามเซิร์ฟเวอร์)
-$max_video_bytes = min(8 * 1024 * 1024, $server_limit); // วิดีโอสูงสุด 8 MB (หรือตามเซิร์ฟเวอร์)
+$max_image_bytes = min(2 * 1024 * 1024, $server_limit);
+$max_doc_bytes   = min(5 * 1024 * 1024, $server_limit);
+$max_video_bytes = min(8 * 1024 * 1024, $server_limit);
 
 // ดักจับกรณีอัปโหลดไฟล์ใหญ่เกิน post_max_size ของเซิร์ฟเวอร์
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES) && !empty($_SERVER['CONTENT_LENGTH'])) {
@@ -223,10 +223,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_unsend_msg'])
     exit();
 }
 
-// 5. ส่งข้อความ / สติกเกอร์ / รูปภาพ / วิดีโอ / เอกสาร
+// 5. ส่งข้อความที่พิมพ์เอง / สติกเกอร์ / รูปภาพ / วิดีโอ / เอกสาร
 $active_friend_id = (int)($_GET['friend_id'] ?? ($_POST['friend_id'] ?? 0));
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isset($_POST['send_sticker'])) && $existing_app) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isset($_POST['send_sticker']) || isset($_POST['message_text'])) && $existing_app) {
     check_auth_token();
     $friend_id = (int)($_POST['friend_id'] ?? 0);
 
@@ -268,7 +268,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isse
             @mkdir($upload_dir, 0755, true);
         }
 
-        // ฟังก์ชันช่วยตรวจสอบและอัปโหลดไฟล์ 1 ช่อง
         $file_inputs = [
             'chat_image' => [
                 'type' => 'image',
@@ -333,7 +332,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isse
             } else {
                 $error = '❌ บันทึกไฟล์ไม่สำเร็จ กรุณาตรวจสอบสิทธิ์โฟลเดอร์ uploads/chat';
             }
-            break; // อัปโหลดครั้งละ 1 ไฟล์
+            break;
         }
 
         if ($error === '' && ($msg_text !== '' || $att_path !== null)) {
@@ -349,7 +348,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['send_chat']) || isse
     }
 }
 
-// กำหนดหน้าแสดงผลปัจจุบัน (5 โหมด)
+// กำหนดหน้าแสดงผลปัจจุบัน
 $step = (!empty($_SESSION['adopter_pdpa_ok']) && ($_GET['step'] ?? '') === 'form') ? 'form' : 'pdpa';
 if (isset($_GET['submitted'])) {
     $step = 'done';
@@ -365,9 +364,10 @@ $search_results = [];
 $active_friend = null;
 $chat_messages = [];
 $confirm_unsend_id = (int)($_GET['confirm_unsend'] ?? 0);
+$view_media_id = (int)($_GET['view_media'] ?? 0);
+$active_media_item = null;
 
 if ($step === 'friends') {
-    // รายชื่อเพื่อนที่เพิ่มแล้วเท่านั้น
     $fl_stmt = $conn->prepare("SELECT u.id, u.full_name, u.nickname, u.avatar
         FROM adopter_friends af
         JOIN users u ON u.id = af.friend_id
@@ -378,7 +378,6 @@ if ($step === 'friends') {
     $friends_list = $fl_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $fl_stmt->close();
 
-    // ค้นหาผู้ใช้เมื่อพิมพ์คำค้นหาเท่านั้น (ไม่แสดงทั้งหมดล่วงหน้า)
     if ($search_query !== '') {
         $like = '%' . $search_query . '%';
         $sq_stmt = $conn->prepare("SELECT u.id, u.full_name, u.nickname, u.avatar,
@@ -393,7 +392,6 @@ if ($step === 'friends') {
         $sq_stmt->close();
     }
 
-    // ถ้ายังไม่เลือก friend_id ให้เลือกเพื่อนคนแรกอัตโนมัติ (ถ้ามี)
     if ($active_friend_id <= 0 && !empty($friends_list)) {
         $active_friend_id = (int)$friends_list[0]['id'];
     }
@@ -415,6 +413,16 @@ if ($step === 'friends') {
             $m_stmt->execute();
             $chat_messages = $m_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $m_stmt->close();
+
+            // ตรวจสอบว่ามีการคลิกเปิดดูรูปภาพหรือวิดีโอแบบเต็มจอหรือไม่
+            if ($view_media_id > 0) {
+                foreach ($chat_messages as $cm) {
+                    if ((int)$cm['id'] === $view_media_id && empty($cm['is_unsent']) && in_array($cm['attachment_type'], ['image', 'video'], true) && !empty($cm['attachment_path'])) {
+                        $active_media_item = $cm;
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -499,23 +507,85 @@ $app_status_label = [
         .msg-bubble { padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; word-break: break-word; }
         .msg-row.mine .msg-bubble { background: #ff6f91; color: #fff; border-bottom-right-radius: 4px; }
         .msg-row.theirs .msg-bubble { background: #f3f4f6; color: #222; border-bottom-left-radius: 4px; }
-        .msg-unsent { font-style: italic; font-size: 13px; color: #888; background: #f9f9f9 !important; border: 1px dashed #ddd; color: #777 !important; }
+        .msg-unsent { font-style: italic; font-size: 13px; background: #f9f9f9 !important; border: 1px dashed #ddd; color: #777 !important; }
         .msg-meta { font-size: 11px; color: #888; margin-top: 3px; display: flex; gap: 8px; align-items: center; }
         .unsend-link { color: #d81b60; text-decoration: none; font-size: 11px; }
         .unsend-confirm-box { background: #fff3cd; border: 1px solid #ffeeba; padding: 10px 14px; border-radius: 12px; margin: 10px 16px 0; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-        .chat-compose { padding: 12px 14px; border-top: 1px solid #ffd6e0; background: #fff; }
-        .compose-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .compose-input { flex: 1; min-width: 180px; padding: 10px 14px; border: 1px solid #ffd6e0; border-radius: 22px; font-family: 'Kanit', sans-serif; font-size: 14px; outline: none; }
-        .icon-upload-label { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #fff0f5; border: 1px solid #ffccd5; cursor: pointer; font-size: 17px; position: relative; overflow: hidden; }
+        /* สไตล์รูปภาพและวิดีโอในแชทที่กดขยายดูได้ */
+        .media-preview-link { display: inline-block; position: relative; border-radius: 12px; overflow: hidden; text-decoration: none; border: 2px solid rgba(255,255,255,0.4); }
+        .media-preview-link:hover { opacity: 0.92; }
+        .media-zoom-badge { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.65); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+
+        /* หน้าต่าง POPUP (CSS + HTML ล้วน) สำหรับดูรูปภาพ/วิดีโอ และปุ่มกากบาทปิด */
+        .media-lightbox-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .media-lightbox-box {
+            position: relative;
+            background: #111;
+            border: 3px solid #fff;
+            border-radius: 16px;
+            max-width: 90vw;
+            max-height: 88vh;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        }
+        .media-lightbox-close {
+            position: absolute;
+            top: -18px;
+            right: -18px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #ff1744;
+            color: #fff;
+            border: 3px solid #fff;
+            font-size: 20px;
+            font-weight: 700;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            z-index: 10000;
+        }
+        .media-lightbox-close:hover {
+            background: #d50000;
+            transform: scale(1.06);
+        }
+        .media-lightbox-content {
+            max-width: 84vw;
+            max-height: 80vh;
+            border-radius: 10px;
+            display: block;
+        }
+
+        /* แถบพิมพ์ข้อความด้านล่าง */
+        .chat-compose { padding: 12px 14px; border-top: 1px solid #ffd6e0; background: #fff; position: relative; z-index: 5; }
+        .compose-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+        .compose-input { flex: 1 1 auto; width: 100%; min-width: 140px; padding: 10px 16px; border: 1.5px solid #ff9ebb; border-radius: 22px; font-family: 'Kanit', sans-serif; font-size: 14px; outline: none; background: #fff; color: #333; }
+        .compose-input:focus { border-color: #d81b60; box-shadow: 0 0 0 3px rgba(216,27,96,0.1); }
+        .icon-upload-label { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #fff0f5; border: 1px solid #ffccd5; cursor: pointer; font-size: 17px; position: relative; overflow: hidden; }
         .icon-upload-label:hover { background: #ffe0ea; }
         .icon-upload-label input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-        .sticker-picker { position: relative; }
+        .sticker-picker { position: relative; flex-shrink: 0; }
         .sticker-picker summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: #fff0f5; border: 1px solid #ffccd5; cursor: pointer; font-size: 18px; }
         .sticker-menu { position: absolute; bottom: 46px; right: 0; width: 250px; background: #fff; border: 1px solid #ffccd5; border-radius: 16px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); display: grid; grid-template-columns: 1fr; gap: 6px; z-index: 20; }
         .sticker-btn { background: #fff7fa; border: 1px solid #ffd6e0; border-radius: 10px; padding: 6px 10px; text-align: left; cursor: pointer; font-family: 'Kanit', sans-serif; font-size: 13px; }
         .sticker-btn:hover { background: #ffe4ec; }
-        .btn-send { background: #d81b60; color: #fff; border: none; padding: 9px 18px; border-radius: 20px; cursor: pointer; font-family: 'Kanit', sans-serif; font-weight: 500; }
+        .btn-send { flex-shrink: 0; background: #d81b60; color: #fff; border: none; padding: 10px 20px; border-radius: 22px; cursor: pointer; font-family: 'Kanit', sans-serif; font-weight: 500; font-size: 14px; white-space: nowrap; }
+        .btn-send:hover { background: #ad1457; }
         .limit-hint { font-size: 11.5px; color: #777; margin-top: 6px; }
 
         @media (max-width: 900px) {
@@ -523,6 +593,7 @@ $app_status_label = [
             .sidebar { width: 100%; border-right: none; border-bottom: 1px solid #ffd6e0; }
             .rules-grid, .chat-shell, .dob-grid { grid-template-columns: 1fr; }
             .friends-panel { border-right: none; border-bottom: 1px solid #ffe4ec; padding-right: 0; padding-bottom: 12px; }
+            .compose-row { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -743,7 +814,7 @@ $app_status_label = [
             </div>
 
             <div class="card-box">
-                <!-- ช่องค้นหาเพื่อน (ไม่แสดงรายชื่อทั้งหมดล่วงหน้า) -->
+                <!-- ช่องค้นหาเพื่อน -->
                 <form method="GET" action="adopter.php" class="search-bar">
                     <input type="hidden" name="view" value="friends">
                     <span>🔍</span>
@@ -815,7 +886,6 @@ $app_status_label = [
                                         <img src="<?= htmlspecialchars(get_avatar_src($active_friend['avatar'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" alt="avatar" class="avatar-sm">
                                         <strong><?= htmlspecialchars($active_friend['full_name'], ENT_QUOTES, 'UTF-8') ?></strong>
                                     </div>
-                                    <!-- โปรไฟล์ของเราอยู่มุมขวาบนของแชท -->
                                     <div class="chat-me-badge">
                                         <img src="<?= htmlspecialchars($my_avatar_src, ENT_QUOTES, 'UTF-8') ?>" alt="me" style="width:28px; height:28px; border-radius:50%; object-fit:cover;">
                                         <span><?= htmlspecialchars($my_display_name, ENT_QUOTES, 'UTF-8') ?> (ฉัน)</span>
@@ -863,8 +933,9 @@ $app_status_label = [
                                                     <div class="msg-bubble">
                                                         <?php if ($m['attachment_type'] === 'image' && !empty($m['attachment_path'])): ?>
                                                             <div style="margin-bottom:6px;">
-                                                                <a href="<?= htmlspecialchars($m['attachment_path'], ENT_QUOTES, 'UTF-8') ?>" target="_blank">
-                                                                    <img src="<?= htmlspecialchars($m['attachment_path'], ENT_QUOTES, 'UTF-8') ?>" alt="image" style="max-width:240px; max-height:220px; border-radius:12px; display:block;">
+                                                                <a href="adopter.php?view=friends&friend_id=<?= (int)$active_friend_id ?>&view_media=<?= (int)$m['id'] ?>" class="media-preview-link" title="คลิกเพื่อดูรูปขนาดใหญ่">
+                                                                    <img src="<?= htmlspecialchars($m['attachment_path'], ENT_QUOTES, 'UTF-8') ?>" alt="image" style="max-width:240px; max-height:220px; border-radius:10px; display:block;">
+                                                                    <span class="media-zoom-badge">🔍 ขยายรูป</span>
                                                                 </a>
                                                             </div>
                                                         <?php elseif ($m['attachment_type'] === 'video' && !empty($m['attachment_path'])): ?>
@@ -872,6 +943,9 @@ $app_status_label = [
                                                                 <video controls style="max-width:260px; max-height:200px; border-radius:12px; display:block;">
                                                                     <source src="<?= htmlspecialchars($m['attachment_path'], ENT_QUOTES, 'UTF-8') ?>">
                                                                 </video>
+                                                                <div style="margin-top:4px; text-align:right;">
+                                                                    <a href="adopter.php?view=friends&friend_id=<?= (int)$active_friend_id ?>&view_media=<?= (int)$m['id'] ?>" style="color:inherit; font-size:12px; text-decoration:underline;">🔍 เปิดดูวิดีโอเต็มจอ</a>
+                                                                </div>
                                                             </div>
                                                         <?php elseif ($m['attachment_type'] === 'file' && !empty($m['attachment_path'])): ?>
                                                             <div style="margin-bottom:6px;">
@@ -898,13 +972,12 @@ $app_status_label = [
                                     <?php endif; ?>
                                 </div>
 
+                                <!-- ฟอร์มพิมพ์และส่งข้อความ -->
                                 <form method="POST" action="adopter.php?view=friends&friend_id=<?= (int)$active_friend_id ?>" enctype="multipart/form-data" class="chat-compose">
                                     <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                                     <input type="hidden" name="friend_id" value="<?= (int)$active_friend_id ?>">
 
                                     <div class="compose-row">
-                                        <input type="text" name="message_text" class="compose-input" placeholder="พิมพ์ข้อความ หรือวางลิงก์ Google Drive / Canva...">
-
                                         <!-- 1. ไอคอนคลิปหนีบกระดาษ (ไฟล์เอกสาร) -->
                                         <label class="icon-upload-label" title="แนบไฟล์เอกสาร (สูงสุด <?= htmlspecialchars(format_mb_label($max_doc_bytes), ENT_QUOTES, 'UTF-8') ?>)">
                                             📎
@@ -923,7 +996,10 @@ $app_status_label = [
                                             <input type="file" name="chat_video" accept=".mp4,.webm,.mov,video/mp4,video/webm,video/quicktime">
                                         </label>
 
-                                        <!-- 4. ปุ่มสติกเกอร์ (ก่อนปุ่มส่ง) -->
+                                        <!-- ช่องพิมพ์ข้อความเอง -->
+                                        <input type="text" name="message_text" class="compose-input" placeholder="พิมพ์ข้อความ หรือวางลิงก์ Google Drive / Canva..." autocomplete="off">
+
+                                        <!-- 4. ปุ่มสติกเกอร์ -->
                                         <details class="sticker-picker">
                                             <summary title="ส่งสติกเกอร์">😸</summary>
                                             <div class="sticker-menu">
@@ -937,14 +1013,14 @@ $app_status_label = [
                                         </details>
 
                                         <!-- 5. ปุ่มส่งข้อความ -->
-                                        <button type="submit" name="send_chat" class="btn-send">ส่ง ✈️</button>
+                                        <button type="submit" name="send_chat" value="1" class="btn-send">ส่ง ✈️</button>
                                     </div>
 
                                     <div class="limit-hint">
                                         * ขนาดไฟล์อัปโหลดตามค่าเซิร์ฟเวอร์: รูปภาพ (.jpg, .jpeg, .png) ≤ <?= htmlspecialchars(format_mb_label($max_image_bytes), ENT_QUOTES, 'UTF-8') ?> |
                                         เอกสาร ≤ <?= htmlspecialchars(format_mb_label($max_doc_bytes), ENT_QUOTES, 'UTF-8') ?> |
                                         วิดีโอ ≤ <?= htmlspecialchars(format_mb_label($max_video_bytes), ENT_QUOTES, 'UTF-8') ?>
-                                        (ไฟล์ใหญ่กว่านี้ให้วางลิงก์ Google Drive / Canva ในช่องข้อความได้เลยค่ะ)
+                                        (หากเลือกไฟล์แนบ ให้กดปุ่ม <strong>ส่ง ✈️</strong> เพื่ออัปโหลด)
                                     </div>
                                 </form>
                             </div>
@@ -955,5 +1031,22 @@ $app_status_label = [
         <?php endif; ?>
     </main>
 </div>
+
+<!-- หน้าต่างแสดงรูปภาพ / วิดีโอขนาดใหญ่ พร้อมปุ่มกากบาท (✕) ปิดหน้าต่าง (HTML + CSS ล้วน) -->
+<?php if ($active_media_item): ?>
+    <div class="media-lightbox-overlay">
+        <div class="media-lightbox-box">
+            <a href="adopter.php?view=friends&friend_id=<?= (int)$active_friend_id ?>" class="media-lightbox-close" title="ปิดหน้าต่าง">✕</a>
+            <?php if ($active_media_item['attachment_type'] === 'image'): ?>
+                <img src="<?= htmlspecialchars($active_media_item['attachment_path'], ENT_QUOTES, 'UTF-8') ?>" alt="รูปภาพขนาดใหญ่" class="media-lightbox-content">
+            <?php elseif ($active_media_item['attachment_type'] === 'video'): ?>
+                <video controls autoplay class="media-lightbox-content">
+                    <source src="<?= htmlspecialchars($active_media_item['attachment_path'], ENT_QUOTES, 'UTF-8') ?>">
+                </video>
+            <?php endif; ?>
+        </div>
+    </div>
+<?php endif; ?>
+
 </body>
 </html>
