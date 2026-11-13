@@ -11,16 +11,23 @@ require_login();
 $user_id = (int)$_SESSION['user_id'];
 $error = '';
 
+// สร้างตารางเพื่อนในแชทอัตโนมัติ (ถ้ายังไม่มี)
+$conn->query("CREATE TABLE IF NOT EXISTS adopter_friends (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    friend_id INT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_pair (user_id, friend_id),
+    CONSTRAINT fk_af_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_af_friend FOREIGN KEY (friend_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
 // ดึงข้อมูลผู้ใช้ปัจจุบัน
 $stmt = $conn->prepare("SELECT full_name, email, avatar, nickname FROM users WHERE id = ? LIMIT 1");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $current_user = $stmt->get_result()->fetch_assoc();
 $stmt->close();
-
-$raw_av = !empty($current_user['avatar']) ? basename($current_user['avatar']) : 'student.jpg';
-$current_avatar = is_file(__DIR__ . '/assets/images/' . $raw_av) ? $raw_av : 'student.jpg';
-$current_name = !empty($current_user['full_name']) ? $current_user['full_name'] : 'ผู้ใช้งาน';
 
 // ตรวจสอบว่าเคยสมัครในตาราง adopter เดิมแล้วหรือยัง
 $chk = $conn->prepare("SELECT * FROM adopter WHERE user_id = ? LIMIT 1");
@@ -30,23 +37,23 @@ $existing_app = $chk->get_result()->fetch_assoc();
 $chk->close();
 
 // =========================================================
-// 1. รับค่า POST: ขั้นตอนที่ 1 (PDPA), ขั้นตอนที่ 2 (สมัครผู้รับเลี้ยง), และแชท
+// 1. รับค่า POST: PDPA / สมัครผู้รับเลี้ยง / เพิ่มเพื่อน / แชท
 // =========================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     check_auth_token();
 
-    // 1A. ยืนยัน PDPA Privacy Notice
+    // 1A. ยืนยัน PDPA
     if (isset($_POST['accept_pdpa'])) {
         if (!empty($_POST['pdpa_read']) && !empty($_POST['pdpa_consent'])) {
             $_SESSION['adopter_pdpa_ok'] = true;
             header("Location: adopter.php?step=form");
             exit();
         } else {
-            $error = '⚠️ กรุณากดติ๊กเครื่องหมายถูกทั้ง 2 ช่องเพื่อรับทราบและยินยอมประกาศความเป็นส่วนตัว (PDPA) ก่อนดำเนินการต่อ';
+            $error = '⚠️ กรุณากดติ๊กเครื่องหมายถูกทั้ง 2 ช่องเพื่อรับทราบและยินยอมประกาศความเป็นส่วนตัว (PDPA)';
         }
     }
 
-    // 1B. บันทึกแบบฟอร์มสมัครเป็นผู้รับเลี้ยงแมวลงตาราง adopter เดิม
+    // 1B. บันทึกแบบฟอร์มสมัครเป็นผู้รับเลี้ยงลงตาราง adopter
     if (isset($_POST['submit_adopter_form'])) {
         if (empty($_SESSION['adopter_pdpa_ok'])) {
             header("Location: adopter.php");
@@ -91,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($fin_sel === '' || ($fin_sel === 'อื่นๆ' && $fin_other === '')) {
             $error = '⚠️ กรุณาเลือกสถานะทางการเงิน (หรือระบุอื่นๆ)';
         } elseif (!$truth_confirm) {
-            $error = '⚠️ กรุณาติ๊กช่อง "ข้าพเจ้าขอยืนยันว่าข้อมูลที่กรอกเป็นความจริง" ก่อนกดสมัคร';
+            $error = '⚠️ กรุณาติ๊กช่องยืนยันความจริงก่อนกดสมัคร';
         } else {
             $birthdate   = sprintf('%04d-%02d-%02d', $b_year_ad, $b_month, $b_day);
             $exp_text    = "เคยเลี้ยงแมว: {$had_cat} | ปัจจุบันมีสัตว์เลี้ยง: {$has_pets}";
@@ -117,75 +124,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // 1C. ส่งข้อความแชท (เมื่อสมัครเป็นผู้รับเลี้ยงแล้ว)
+    // 1C. เพิ่มเพื่อนเข้าแชท
+    if (isset($_POST['add_friend_id']) && $existing_app) {
+        $fid = (int)$_POST['add_friend_id'];
+        if ($fid > 0 && $fid !== $user_id) {
+            $ins = $conn->prepare("INSERT IGNORE INTO adopter_friends (user_id, friend_id) VALUES (?, ?)");
+            $ins->bind_param("ii", $user_id, $fid);
+            $ins->execute();
+            $ins->close();
+        }
+        header("Location: adopter.php?view=friends&chat_with=" . $fid);
+        exit();
+    }
+
+    // 1D. ส่งข้อความแชท
     if (isset($_POST['chat_message']) && $existing_app) {
         $msg = trim((string)$_POST['chat_message']);
-        if ($msg !== '') {
-            if (!isset($_SESSION['chat_history_raw'])) {
-                $_SESSION['chat_history_raw'] = [
-                    ['sender_id' => 2, 'receiver_id' => $user_id, 'content' => 'สวัสดีค่ะ ยินดีที่ได้คุยกันนะคะ 🌸💕', 'type' => 'text', 'file_url' => '', 'time' => '15:42'],
-                    ['sender_id' => $user_id, 'receiver_id' => 2, 'content' => 'ขอบคุณสำหรับคำแนะนำค่ะ 😊', 'type' => 'text', 'file_url' => '', 'time' => '15:42'],
-                    ['sender_id' => 2, 'receiver_id' => $user_id, 'content' => 'ยินดีค่ะ มีอะไรสอบถามได้เลยนะคะ', 'type' => 'text', 'file_url' => '', 'time' => '15:43']
-                ];
+        $chat_with = (int)($_POST['chat_with_id'] ?? 0);
+        if ($msg !== '' && $chat_with > 0) {
+            if (!isset($_SESSION['chat_msgs'][$chat_with])) {
+                $_SESSION['chat_msgs'][$chat_with] = [];
             }
-            $_SESSION['chat_history_raw'][] = [
+            $_SESSION['chat_msgs'][$chat_with][] = [
                 'sender_id' => $user_id,
-                'receiver_id' => 2,
-                'content' => $msg,
-                'type' => 'text',
-                'file_url' => '',
-                'time' => date('H:i')
+                'content'   => $msg,
+                'time'      => date('H:i')
             ];
-            header("Location: adopter.php");
+            header("Location: adopter.php?view=friends&chat_with=" . $chat_with);
             exit();
         }
     }
 }
 
 // =========================================================
-// 2. กำหนดโหมดหน้าจอ: pdpa -> form -> done -> chat
+// 2. กำหนดโหมดหน้าจอ: pdpa -> form -> done -> rules -> friends
 // =========================================================
+$req_view = $_GET['view'] ?? '';
 if ($existing_app && isset($_GET['submitted'])) {
     $view_mode = 'done';
+} elseif ($existing_app && $req_view === 'friends') {
+    $view_mode = 'friends';
 } elseif ($existing_app) {
-    $view_mode = 'chat';
+    $view_mode = 'rules'; // หน้าเงื่อนไขการสมัครเป็นผู้รับเลี้ยงแมว (ย้อนกลับมาอ่านได้ตลอด)
 } elseif (!empty($_SESSION['adopter_pdpa_ok']) && ($_GET['step'] ?? '') === 'form') {
     $view_mode = 'form';
 } else {
     $view_mode = 'pdpa';
 }
 
-// เตรียมข้อมูลแชทเฉพาะเมื่อเข้าสู่หน้า chat
-$case = 1;
-$friends_list = [];
-$chat_history = [];
-if ($view_mode === 'chat') {
-    $friends_query = $conn->query("SELECT id, full_name as name, avatar FROM users WHERE id != $user_id LIMIT 3");
-    $friends_data = [];
-    if ($friends_query) {
-        while ($row = $friends_query->fetch_assoc()) $friends_data[] = $row;
+// ดึงรายชื่อเพื่อนที่เพิ่มแล้ว & สมาชิกที่ยังไม่ได้เพิ่ม (สำหรับโหมด friends)
+$added_friends = [];
+$suggested_users = [];
+$active_chat_id = isset($_GET['chat_with']) ? (int)$_GET['chat_with'] : 0;
+
+if ($view_mode === 'friends') {
+    $fq = $conn->prepare("SELECT u.id, u.full_name, u.avatar FROM adopter_friends af JOIN users u ON af.friend_id = u.id WHERE af.user_id = ?");
+    $fq->bind_param("i", $user_id);
+    $fq->execute();
+    $fres = $fq->get_result();
+    while ($r = $fres->fetch_assoc()) $added_friends[] = $r;
+    $fq->close();
+
+    if ($active_chat_id === 0 && !empty($added_friends)) {
+        $active_chat_id = (int)$added_friends[0]['id'];
     }
 
-    $messages_data = $_SESSION['chat_history_raw'] ?? [
-        ['sender_id' => 2, 'receiver_id' => $user_id, 'content' => 'สวัสดีค่ะ ยินดีที่ได้คุยกันนะคะ 🌸💕', 'type' => 'text', 'file_url' => '', 'time' => '15:42'],
-        ['sender_id' => $user_id, 'receiver_id' => 2, 'content' => 'ขอบคุณสำหรับคำแนะนำค่ะ 😊', 'type' => 'text', 'file_url' => '', 'time' => '15:42'],
-        ['sender_id' => 2, 'receiver_id' => $user_id, 'content' => 'ยินดีค่ะ มีอะไรสอบถามได้เลยนะคะ', 'type' => 'text', 'file_url' => '', 'time' => '15:43']
-    ];
-
-    $arg_friends = escapeshellarg(json_encode($friends_data));
-    $arg_messages = escapeshellarg(json_encode($messages_data));
-    $python_output = @shell_exec("python3 chat_logic.py $user_id $arg_friends $arg_messages");
-    $app_state = json_decode((string)$python_output, true);
-
-    if (isset($app_state['case'])) {
-        $case = (int)$app_state['case'];
-        $friends_list = $app_state['friends_list'] ?? [];
-        $chat_history = $app_state['chat_history'] ?? [];
-    } else {
-        $case = (count($friends_data) > 0) ? 2 : 1;
-        $friends_list = $friends_data;
-        $chat_history = $messages_data;
-    }
+    $sq = $conn->prepare("SELECT id, full_name, avatar FROM users WHERE id != ? AND id NOT IN (SELECT friend_id FROM adopter_friends WHERE user_id = ?) LIMIT 8");
+    $sq->bind_param("ii", $user_id, $user_id);
+    $sq->execute();
+    $sres = $sq->get_result();
+    while ($r = $sres->fetch_assoc()) $suggested_users[] = $r;
+    $sq->close();
 }
 
 $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'มีนาคม',4=>'เมษายน',5=>'พฤษภาคม',6=>'มิถุนายน',7=>'กรกฎาคม',8=>'สิงหาคม',9=>'กันยายน',10=>'ตุลาคม',11=>'พฤศจิกายน',12=>'ธันวาคม'];
@@ -208,8 +217,7 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
         .dash-nav-item.active, .dash-nav-item:hover { background: #ff758c; color: white; }
         .dash-main { padding: 22px 30px; overflow-y: auto; }
 
-        /* สไตล์ PDPA & แบบฟอร์มสมัคร */
-        .reg-container { max-width: 780px; margin: 0 auto; background: #ffffff; border-radius: 24px; padding: 30px; border: 1.5px solid #ffccd5; box-shadow: 0 6px 20px rgba(255,117,140,0.06); }
+        .reg-container { max-width: 820px; margin: 0 auto; background: #ffffff; border-radius: 24px; padding: 30px; border: 1.5px solid #ffccd5; }
         .reg-title { text-align: center; color: #1976d2; margin: 0 0 4px 0; font-size: 23px; }
         .reg-sub { text-align: center; color: #777; font-size: 13.5px; margin: 0 0 20px 0; }
         .pdpa-scroll { max-height: 320px; overflow-y: auto; background: #fff8f9; border: 1px solid #ffccd5; border-radius: 16px; padding: 18px; font-size: 13.5px; line-height: 1.7; margin-bottom: 16px; }
@@ -231,19 +239,32 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
         .alert-ok { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; padding: 24px; border-radius: 18px; text-align: center; font-size: 15px; line-height: 1.7; }
         .qual-box { background: #f5f9ff; border: 1px solid #bbdefb; border-radius: 16px; padding: 16px 20px; font-size: 13px; line-height: 1.65; margin-bottom: 18px; }
 
-        /* สไตล์หน้าแชท */
-        .status-banner { padding: 12px 18px; border-radius: 14px; margin-bottom: 16px; font-size: 13.5px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .status-pending { background: #fff8e1; border: 1px solid #ffe082; color: #8d6e63; }
-        .status-approved { background: #e8f5e9; border: 1px solid #a5d6a7; color: #1b5e20; }
-        .empty-friends-card { background: white; border-radius: 24px; border: 1.5px solid #ffccd5; padding: 50px 20px; text-align: center; }
-        .chat-active-card { background: white; border-radius: 24px; border: 1.5px solid #ffccd5; display: grid; grid-template-columns: 260px 1fr; min-height: 520px; overflow: hidden; }
+        /* แถบสถานะ & การ์ดเงื่อนไข 2 ฝั่ง (ตามภาพร่าง) */
+        .status-banner { padding: 14px 22px; border-radius: 24px; margin-bottom: 20px; font-size: 14.5px; font-weight: 500; border: 1.5px solid #ffe082; background: #fff8e1; color: #5d4037; }
+        .status-approved { border-color: #a5d6a7; background: #e8f5e9; color: #1b5e20; }
+        .rules-card { background: #ffffff; border: 2px solid #ffccd5; border-radius: 28px; padding: 28px; position: relative; }
+        .rules-heading { text-align: center; color: #7b1fa2; font-size: 20px; font-weight: 700; margin: 0 0 22px 0; }
+        .rules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; border-top: 1px dashed #ffccd5; padding-top: 20px; }
+        .rules-col-left { border-right: 1.5px solid #ffccd5; padding-right: 22px; }
+        .rules-col h4 { color: #d81b60; margin: 0 0 12px 0; font-size: 16px; }
+        .rules-col p { font-size: 14px; line-height: 1.7; margin: 0 0 12px 0; color: #333; }
+        .next-btn-wrap { display: flex; justify-content: flex-end; margin-top: 22px; }
+        .btn-next-page { display: inline-flex; align-items: center; gap: 8px; background: #d81b60; color: white; padding: 11px 26px; border-radius: 24px; text-decoration: none; font-weight: 600; font-size: 14.5px; }
+        .btn-next-page:hover { background: #ad1457; }
+
+        /* หน้าเพิ่มเพื่อน & แชท */
+        .empty-friends-card { background: white; border-radius: 24px; border: 1.5px solid #ffccd5; padding: 40px 25px; text-align: center; }
+        .suggest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 22px; text-align: left; }
+        .suggest-card { background: #fff8f9; border: 1px solid #ffccd5; border-radius: 16px; padding: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .btn-add-fr { background: #ff4081; color: white; border: none; padding: 6px 14px; border-radius: 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: 'Kanit'; }
+        .chat-active-card { background: white; border-radius: 24px; border: 1.5px solid #ffccd5; display: grid; grid-template-columns: 260px 1fr; min-height: 500px; overflow: hidden; }
         .friend-sidebar { border-right: 1.5px solid #ffccd5; background: #fffafb; padding: 15px; display: flex; flex-direction: column; gap: 8px; }
-        .friend-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; background: white; border: 1px solid #ffe4e8; }
+        .friend-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; background: white; border: 1px solid #ffe4e8; text-decoration: none; color: #333; }
+        .friend-item.active { background: #fff0f3; border-color: #ff758c; }
         .chat-area { display: flex; flex-direction: column; justify-content: space-between; padding: 18px; background: #fffdfd; }
-        .chat-messages { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 400px; padding-right: 5px; }
-        .bubble-left { align-self: flex-start; background: #fff0f3; color: #333; padding: 10px 15px; border-radius: 16px 16px 16px 4px; max-width: 75%; font-size: 14px; }
+        .chat-messages { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; max-height: 380px; }
         .bubble-right { align-self: flex-end; background: #ff758c; color: white; padding: 10px 15px; border-radius: 16px 16px 4px 16px; max-width: 75%; font-size: 14px; }
-        @media (max-width: 768px) { .chat-active-card { grid-template-columns: 1fr; } .dob-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .rules-grid, .chat-active-card, .dob-grid { grid-template-columns: 1fr; } .rules-col-left { border-right: none; border-bottom: 1.5px solid #ffccd5; padding-right: 0; padding-bottom: 16px; } }
     </style>
 </head>
 <body>
@@ -254,7 +275,7 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
         <a href="profile.php" class="dash-nav-item"><?= $L['nav_profile'] ?? '👤 ประวัติผู้ใช้งาน' ?></a>
         <a href="contact.php" class="dash-nav-item"><?= $L['nav_contact'] ?? '✉️ ติดต่อผู้ประกาศ/แอดมิน' ?></a>
         <a href="buy_cat.php" class="dash-nav-item"><?= $L['nav_buy'] ?? '🛒 ซื้อแมว' ?></a>
-        <a href="adopter.php" class="dash-nav-item active"><?= $L['nav_chat'] ?? '💬 ติดต่อผู้ขอรับเลี้ยง' ?></a>
+        <a href="adopter.php" class="dash-nav-item active"><?= $L['nav_chat'] ?? '💬 สมัครเป็นผู้รับเลี้ยงและติดต่อผ่านแชท' ?></a>
         <a href="settings.php" class="dash-nav-item"><?= $L['nav_settings'] ?? '⚙️ การตั้งค่า' ?></a>
         <div style="margin-top: auto;">
             <form action="logout.php" method="POST" style="margin:0;">
@@ -266,10 +287,7 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
 
     <main class="dash-main">
         <?php if (file_exists('config/search.php')) include 'config/search.php'; ?>
-
-        <?php if ($error): ?>
-            <div class="alert-err"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div>
-        <?php endif; ?>
+        <?php if ($error): ?><div class="alert-err"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
 
         <?php if ($view_mode === 'pdpa'): ?>
             <!-- 1. หน้า PDPA Privacy Notice -->
@@ -289,19 +307,12 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                     <h4>5. สิทธิของเจ้าของข้อมูล</h4>
                     <p>ผู้สมัครสามารถติดต่อผู้ดูแลเว็บไซต์เพื่อสอบถามเกี่ยวกับข้อมูลส่วนบุคคล ขอแก้ไขข้อมูลที่ไม่ถูกต้อง หรือใช้สิทธิอื่น ๆ ตามที่กฎหมายคุ้มครองข้อมูลส่วนบุคคลกำหนด</p>
                 </div>
-
                 <form method="POST" action="adopter.php">
                     <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                     <div class="green-check-box">
                         <strong style="display:block; margin-bottom:10px; color:#1b5e20;">✅ การยืนยันและรับทราบ</strong>
-                        <label class="green-check-item">
-                            <input type="checkbox" name="pdpa_read" value="1" required>
-                            <span>ข้าพเจ้าได้อ่านและรับทราบประกาศความเป็นส่วนตัว (Privacy Notice) รวมถึงเข้าใจวัตถุประสงค์ในการเก็บรวบรวมและใช้ข้อมูลส่วนบุคคลเพื่อประกอบการพิจารณาสมัครเป็นผู้รับเลี้ยงแมวแล้ว</span>
-                        </label>
-                        <label class="green-check-item">
-                            <input type="checkbox" name="pdpa_consent" value="1" required>
-                            <span>ข้าพเจ้าขอยืนยันว่าข้อมูลที่ให้ไว้เป็นความจริง และยินยอมให้ใช้ข้อมูลตามวัตถุประสงค์ที่แจ้งไว้</span>
-                        </label>
+                        <label class="green-check-item"><input type="checkbox" name="pdpa_read" value="1" required><span>ข้าพเจ้าได้อ่านและรับทราบประกาศความเป็นส่วนตัว (Privacy Notice) รวมถึงเข้าใจวัตถุประสงค์ในการเก็บรวบรวมและใช้ข้อมูลส่วนบุคคลเพื่อประกอบการพิจารณาสมัครเป็นผู้รับเลี้ยงแมวแล้ว</span></label>
+                        <label class="green-check-item"><input type="checkbox" name="pdpa_consent" value="1" required><span>ข้าพเจ้าขอยืนยันว่าข้อมูลที่ให้ไว้เป็นความจริง และยินยอมให้ใช้ข้อมูลตามวัตถุประสงค์ที่แจ้งไว้</span></label>
                     </div>
                     <button type="submit" name="accept_pdpa" class="btn-primary">✔ ยืนยันและไปหน้าแบบฟอร์มผู้สมัคร →</button>
                 </form>
@@ -312,7 +323,6 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
             <div class="reg-container">
                 <h2 class="reg-title">สมัครเป็นผู้รับเลี้ยงแมว</h2>
                 <p class="reg-sub">Adopter Registration Form — กรุณากรอกข้อมูลเพื่อประกอบการพิจารณารับเลี้ยงแมว</p>
-
                 <div class="qual-box">
                     <p style="margin-top:0;">แบบฟอร์มนี้จัดทำขึ้นเพื่อเปิดรับสมัครบุคคลทั่วไปและผู้ที่มีความสนใจเป็นผู้รับเลี้ยงแมว โดยมีวัตถุประสงค์เพื่อรวบรวมข้อมูลส่วนบุคคลและข้อมูลที่เกี่ยวข้องกับผู้สมัคร สำหรับใช้ในการตรวจสอบความน่าเชื่อถือ ประเมินความพร้อม และพิจารณาคุณสมบัติเบื้องต้นก่อนอนุมัติให้เป็นผู้รับเลี้ยงแมวเท่านั้น</p>
                     <strong>คุณสมบัติของผู้สมัครเป็นผู้รับเลี้ยงแมว</strong>
@@ -323,7 +333,6 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                     </ol>
                     <small style="color:#d81b60;"><strong>หมายเหตุ:</strong> การกรอกแบบฟอร์มและส่งข้อมูลสมัครไม่ได้หมายความว่าจะได้รับอนุมัติให้เป็นผู้รับเลี้ยงโดยอัตโนมัติ ผู้ดูแลระบบจะพิจารณาจากข้อมูลและคุณสมบัติของผู้สมัครก่อนดำเนินการอนุมัติ</small>
                 </div>
-
                 <form method="POST" action="adopter.php?step=form">
                     <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
                     <div class="section-box">
@@ -351,7 +360,6 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                         </select>
                         <div class="other-row"><span style="font-size:13px;color:#666;">อื่นๆ:</span><input type="text" name="occupation_other" placeholder="ระบุอาชีพอื่นๆ (กรณีเลือกอื่นๆ)"></div>
                     </div>
-
                     <div class="section-box">
                         <div class="section-title">ส่วนที่ 2 ประสบการณ์ในการเลี้ยงแมว *</div>
                         <label class="form-label">เคยเลี้ยงแมวมาก่อนหรือไม่ *</label>
@@ -359,7 +367,6 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                         <label class="form-label">ปัจจุบันมีสัตว์เลี้ยงหรือไม่ *</label>
                         <div class="radio-group"><label><input type="radio" name="has_current_pets" value="มี" required> มี</label><label><input type="radio" name="has_current_pets" value="ไม่มี" checked> ไม่มี</label></div>
                     </div>
-
                     <div class="section-box">
                         <div class="section-title">ส่วนที่ 3 ความพร้อมในการเลี้ยง *</div>
                         <label class="form-label">ประเภทที่พักอาศัย *</label>
@@ -371,8 +378,7 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                             <option value="หอพัก / อพาร์ตเมนต์">หอพัก / อพาร์ตเมนต์</option>
                             <option value="อื่นๆ">อื่นๆ (โปรดระบุช่องด้านล่าง)</option>
                         </select>
-                        <div class="other-row"><span style="font-size:13px;color:#666;">อื่นๆ:</span><input type="text" name="accommodation_other" placeholder="ระบุประเภทที่พักอื่นๆ (กรณีเลือกอื่นๆ)"></div>
-
+                        <div class="other-row"><span style="font-size:13px;color:#666;">อื่นๆ:</span><input type="text" name="accommodation_other" placeholder="ระบุประเภทที่พักอื่นๆ"></div>
                         <label class="form-label">สถานะทางการเงิน *</label>
                         <select name="financial_status" class="form-control" required>
                             <option value="">เลือกสถานะทางการเงิน</option>
@@ -382,26 +388,19 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                             <option value="ผู้ปกครองสนับสนุน">ผู้ปกครองสนับสนุน</option>
                             <option value="อื่นๆ">อื่นๆ (โปรดระบุช่องด้านล่าง)</option>
                         </select>
-                        <div class="other-row"><span style="font-size:13px;color:#666;">อื่นๆ:</span><input type="text" name="financial_other" placeholder="ระบุสถานะทางการเงินอื่นๆ (กรณีเลือกอื่นๆ)"></div>
-
+                        <div class="other-row"><span style="font-size:13px;color:#666;">อื่นๆ:</span><input type="text" name="financial_other" placeholder="ระบุสถานะทางการเงินอื่นๆ"></div>
                         <label class="form-label">ที่พักอนุญาตให้เลี้ยงสัตว์หรือไม่ *</label>
                         <div class="radio-group"><label><input type="radio" name="pet_allowed" value="อนุญาต" checked required> อนุญาต</label><label><input type="radio" name="pet_allowed" value="ไม่อนุญาต"> ไม่อนุญาต</label><label><input type="radio" name="pet_allowed" value="ไม่แน่ใจ"> ไม่แน่ใจ</label></div>
                     </div>
-
                     <div class="section-box">
                         <div class="section-title">ส่วนที่ 4 ข้อมูลสุขภาพ</div>
                         <label class="form-label">มีโรคประจำตัวหรือไม่ (ไม่บังคับ)</label>
                         <div class="radio-group"><label><input type="radio" name="has_chronic_disease" value="มี"> มี</label><label><input type="radio" name="has_chronic_disease" value="ไม่มี" checked> ไม่มี</label></div>
                         <label class="form-label">รายละเอียดเพิ่มเติม (ไม่บังคับ)</label>
                         <textarea name="health_details" class="form-control" rows="3" style="border-radius:16px;" placeholder="ระบุข้อมูลเพิ่มเติม หากต้องการ"></textarea>
-                        <small style="color:#777; display:block; margin-bottom:14px;">ข้อมูลสุขภาพควรเก็บเท่าที่จำเป็น พร้อมแจ้งวัตถุประสงค์การใช้งานและจำกัดผู้ที่เข้าถึงข้อมูล</small>
                     </div>
-
                     <div class="green-check-box">
-                        <label class="green-check-item" style="margin-bottom:0;">
-                            <input type="checkbox" name="truth_confirm" value="1" required>
-                            <span><strong>ข้าพเจ้าขอยืนยันว่าข้อมูลที่กรอกเป็นความจริง</strong> เพื่อใช้ในการสมัครเป็นผู้รับเลี้ยงเท่านั้น *</span>
-                        </label>
+                        <label class="green-check-item" style="margin-bottom:0;"><input type="checkbox" name="truth_confirm" value="1" required><span><strong>ข้าพเจ้าขอยืนยันว่าข้อมูลที่กรอกเป็นความจริง</strong> เพื่อใช้ในการสมัครเป็นผู้รับเลี้ยงเท่านั้น *</span></label>
                     </div>
                     <button type="submit" name="submit_adopter_form" class="btn-primary">🐾 สมัครเป็นผู้รับเลี้ยง</button>
                 </form>
@@ -413,61 +412,125 @@ $th_months = [1=>'มกราคม',2=>'กุมภาพันธ์',3=>'�
                 <div class="alert-ok">
                     <div style="font-size:40px; margin-bottom:8px;">💖🐾</div>
                     <strong>สมัครเป็นผู้รับเลี้ยงเรียบร้อยแล้ว โปรดรอการพิจารณาจากผู้ประกาศ/ผู้ดูแลระบบอีกครั้ง</strong><br>
-                    <span style="font-size:13px; color:#2e7d32;">สถานะคำขอปัจจุบัน: <?= htmlspecialchars($existing_app['application_status'] ?? 'pending', ENT_QUOTES, 'UTF-8') ?></span>
                     <div style="margin-top:18px;">
-                        <a href="adopter.php" style="display:inline-block; background:#d81b60; color:white; padding:10px 26px; border-radius:20px; text-decoration:none; font-weight:600;">เข้าสู่หน้าผู้รับเลี้ยง (Adopter) →</a>
+                        <a href="adopter.php" style="display:inline-block; background:#d81b60; color:white; padding:10px 26px; border-radius:20px; text-decoration:none; font-weight:600;">ดูเงื่อนไขและสถานะผู้รับเลี้ยง →</a>
                     </div>
+                </div>
+            </div>
+
+        <?php elseif ($view_mode === 'rules'): ?>
+            <!-- 4. หน้าเงื่อนไขการสมัครเป็นผู้รับเลี้ยงแมว (ย้อนกลับมาอ่านได้ตลอด ตามแบบร่าง 2 ฝั่ง) -->
+            <?php
+                $st_app = $existing_app['application_status'] ?? 'pending';
+                $applicant_fullname = htmlspecialchars($existing_app['firstname'] . ' ' . $existing_app['lastname'], ENT_QUOTES, 'UTF-8');
+            ?>
+            <div class="status-banner <?= $st_app === 'approved' ? 'status-approved' : '' ?>">
+                สถานะผู้รับเลี้ยงของคุณ (<strong><?= $applicant_fullname ?></strong>):
+                <?= $st_app === 'approved' ? '✅ ผ่านการสมัครเป็นผู้รับเลี้ยงแมวแล้ว (Approved)' : '⏳ รอการพิจารณาจากผู้ประกาศ (Pending)' ?>
+            </div>
+
+            <div class="rules-card">
+                <h2 class="rules-heading">📢 ประกาศสมัครเป็นผู้รับเลี้ยงแมว</h2>
+                <div class="rules-grid">
+                    <div class="rules-col rules-col-left">
+                        <h4>คุณสมบัติของผู้สมัครเป็นผู้รับเลี้ยงแมว</h4>
+                        <p><strong>1. ด้านอายุ:</strong> อายุ 18 ปีขึ้นไป หรือผู้ที่อายุต่ำกว่า 18 ปีสามารถสมัครได้ โดยต้องได้รับความยินยอมจากผู้ปกครอง</p>
+                        <p><strong>2. ด้านความรับผิดชอบ:</strong> มีความรับผิดชอบและพร้อมดูแลแมวอย่างต่อเนื่อง ไม่ทอดทิ้งหรือปล่อยปละละเลย</p>
+                        <p><strong>3. ด้านความพร้อม:</strong> มีเวลา สถานที่ที่เหมาะสม และสามารถรับผิดชอบค่าใช้จ่ายในการเลี้ยงดูแมวได้</p>
+                    </div>
+                    <div class="rules-col">
+                        <h4>จะรู้ได้อย่างไร ว่าได้รับคัดเลือกให้เป็นผู้รับเลี้ยงแมว?</h4>
+                        <p><strong>1.</strong> ผู้ประกาศจะดูจากคุณสมบัติของผู้สมัคร ที่กำหนดไว้ข้างต้น</p>
+                        <p><strong>2.</strong> สถานะจะขึ้นว่า <strong>ผ่านการสมัครเป็นผู้รับเลี้ยงแมว</strong></p>
+                    </div>
+                </div>
+                <div class="next-btn-wrap">
+                    <a href="adopter.php?view=friends" class="btn-next-page">หน้าถัดไป (เพิ่มเพื่อน / แชท) →</a>
                 </div>
             </div>
 
         <?php else: ?>
-            <!-- 4. หน้าผู้รับเลี้ยง (แสดงสถานะ + ระบบแชทติดต่อผู้ส่งต่อ/แอดมิน) -->
-            <?php $st_app = $existing_app['application_status'] ?? 'pending'; ?>
-            <div class="status-banner <?= $st_app === 'approved' ? 'status-approved' : 'status-pending' ?>">
-                <div>
-                    <strong>สถานะผู้รับเลี้ยงของคุณ (<?= htmlspecialchars($existing_app['firstname'] . ' ' . $existing_app['lastname'], ENT_QUOTES, 'UTF-8') ?>):</strong>
-                    <?= $st_app === 'approved' ? '✅ อนุมัติแล้ว (Approved)' : '⏳ รอการพิจารณาจากผู้ประกาศ/ผู้ดูแลระบบ (Pending)' ?>
-                </div>
-                <a href="buy_cat.php" style="color:#d81b60; font-weight:600; text-decoration:none;">🐾 ดูประกาศแมวหาบ้าน →</a>
+            <!-- 5. หน้าถัดไป: หน้าเพิ่มเพื่อน & แชท -->
+            <div style="margin-bottom: 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <a href="adopter.php" style="color:#d81b60; text-decoration:none; font-weight:600; font-size:14px;">← ย้อนกลับไปอ่านเงื่อนไขผู้รับเลี้ยง</a>
             </div>
 
-            <?php if ($case === 1): ?>
+            <?php if (empty($added_friends)): ?>
                 <div class="empty-friends-card">
-                    <div style="font-size:48px; margin-bottom:10px;">💬🐾</div>
-                    <h3 style="color:#d81b60;">ยังไม่มีรายชื่อผู้ติดต่อ</h3>
-                    <p style="color:#777; font-size:14px;">ค้นหาผู้ประกาศหรือดูรายการแมวเพื่อเริ่มพูดคุยได้เลย</p>
-                    <a href="buy_cat.php" style="display:inline-block; margin-top:10px; background:#ff4081; color:white; padding:12px 28px; border-radius:24px; text-decoration:none; font-weight:600;">ดูประกาศแมว</a>
+                    <div style="font-size:48px; margin-bottom:10px;">🐱💬</div>
+                    <h3 style="color:#d81b60; margin:0 0 8px 0;">ยังไม่มีรายชื่อเพื่อนในแชท</h3>
+                    <p style="color:#777; font-size:14px; margin:0;">คุณยังไม่ได้เพิ่มเพื่อนหรือผู้ประกาศหาบ้านให้แมว กดเลือกสมาชิกด้านล่างเพื่อเพิ่มเพื่อนและเริ่มพูดคุยได้เลยค่ะ</p>
+
+                    <?php if (!empty($suggested_users)): ?>
+                        <div class="suggest-grid">
+                            <?php foreach ($suggested_users as $su):
+                                $sav = basename((string)$su['avatar']);
+                                $sav_ok = ($sav !== '' && is_file(__DIR__ . '/assets/images/' . $sav)) ? $sav : 'student.jpg';
+                            ?>
+                                <div class="suggest-card">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <img src="assets/images/<?= htmlspecialchars($sav_ok, ENT_QUOTES, 'UTF-8') ?>" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
+                                        <strong style="font-size:13.5px;"><?= htmlspecialchars($su['full_name'], ENT_QUOTES, 'UTF-8') ?></strong>
+                                    </div>
+                                    <form method="POST" action="adopter.php?view=friends" style="margin:0;">
+                                        <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                                        <input type="hidden" name="add_friend_id" value="<?= (int)$su['id'] ?>">
+                                        <button type="submit" class="btn-add-fr">+ เพิ่มเพื่อน</button>
+                                    </form>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
             <?php else: ?>
                 <div class="chat-active-card">
                     <div class="friend-sidebar">
-                        <strong style="color:#d81b60; font-size:14px; margin-bottom:6px;">💬 รายชื่อผู้ติดต่อ</strong>
-                        <?php foreach ($friends_list as $fr):
+                        <strong style="color:#d81b60; font-size:14px; margin-bottom:6px;">💬 รายชื่อเพื่อน (<?= count($added_friends) ?>)</strong>
+                        <?php foreach ($added_friends as $fr):
+                            $fid = (int)$fr['id'];
                             $fav = basename((string)($fr['avatar'] ?? 'student.jpg'));
-                            $fav_ok = is_file(__DIR__ . '/assets/images/' . $fav) ? $fav : 'student.jpg';
+                            $fav_ok = ($fav !== '' && is_file(__DIR__ . '/assets/images/' . $fav)) ? $fav : 'student.jpg';
                         ?>
-                            <div class="friend-item">
+                            <a href="adopter.php?view=friends&chat_with=<?= $fid ?>" class="friend-item <?= $active_chat_id === $fid ? 'active' : '' ?>">
                                 <img src="assets/images/<?= htmlspecialchars($fav_ok, ENT_QUOTES, 'UTF-8') ?>" style="width:38px; height:38px; border-radius:50%; object-fit:cover;">
                                 <div>
-                                    <div style="font-size:13.5px; font-weight:600;"><?= htmlspecialchars($fr['name'] ?? 'ผู้ใช้งาน', ENT_QUOTES, 'UTF-8') ?></div>
+                                    <div style="font-size:13.5px; font-weight:600;"><?= htmlspecialchars($fr['full_name'], ENT_QUOTES, 'UTF-8') ?></div>
                                     <div style="font-size:11px; color:#2e7d32;">● ออนไลน์</div>
                                 </div>
-                            </div>
+                            </a>
                         <?php endforeach; ?>
+
+                        <?php if (!empty($suggested_users)): ?>
+                            <hr style="border:none; border-top:1px dashed #ffccd5; width:100%; margin:8px 0;">
+                            <strong style="color:#888; font-size:12px;">+ เพิ่มเพื่อนเพิ่มเติม</strong>
+                            <?php foreach (array_slice($suggested_users, 0, 3) as $su): ?>
+                                <form method="POST" action="adopter.php?view=friends" style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin:0;">
+                                    <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                                    <input type="hidden" name="add_friend_id" value="<?= (int)$su['id'] ?>">
+                                    <span style="font-size:12.5px;"><?= htmlspecialchars($su['full_name'], ENT_QUOTES, 'UTF-8') ?></span>
+                                    <button type="submit" class="btn-add-fr" style="padding:3px 10px; font-size:11px;">+ เพิ่ม</button>
+                                </form>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
+
                     <div class="chat-area">
                         <div class="chat-messages">
-                            <?php foreach ($chat_history as $ch):
-                                $is_me = ((int)($ch['sender_id'] ?? 0) === $user_id);
-                            ?>
-                                <div class="<?= $is_me ? 'bubble-right' : 'bubble-left' ?>">
-                                    <?= htmlspecialchars($ch['content'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-                                    <div style="font-size:10px; opacity:0.75; margin-top:4px; text-align:right;"><?= htmlspecialchars($ch['time'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-                                </div>
-                            <?php endforeach; ?>
+                            <?php $msgs = $_SESSION['chat_msgs'][$active_chat_id] ?? []; ?>
+                            <?php if (empty($msgs)): ?>
+                                <p style="text-align:center; color:#aaa; font-size:13px; margin-top:40px;">เริ่มต้นทักทายพูดคุยกันได้เลยค่ะ 🌸</p>
+                            <?php else: ?>
+                                <?php foreach ($msgs as $m): ?>
+                                    <div class="bubble-right">
+                                        <?= htmlspecialchars($m['content'], ENT_QUOTES, 'UTF-8') ?>
+                                        <div style="font-size:10px; opacity:0.8; margin-top:4px; text-align:right;"><?= htmlspecialchars($m['time'], ENT_QUOTES, 'UTF-8') ?></div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </div>
-                        <form method="POST" action="adopter.php" style="display:flex; gap:10px; margin-top:15px; padding-top:12px; border-top:1px solid #ffe4e8;">
+                        <form method="POST" action="adopter.php?view=friends&chat_with=<?= $active_chat_id ?>" style="display:flex; gap:10px; margin-top:15px; padding-top:12px; border-top:1px solid #ffe4e8;">
                             <input type="hidden" name="auth_csrf" value="<?= auth_escape(auth_token()) ?>">
+                            <input type="hidden" name="chat_with_id" value="<?= $active_chat_id ?>">
                             <input type="text" name="chat_message" placeholder="พิมพ์ข้อความ..." required style="flex:1; padding:10px 16px; border-radius:20px; border:1px solid #ffccd5; background:#fff8f9; font-family:'Kanit'; outline:none;">
                             <button type="submit" style="background:#d81b60; color:white; border:none; padding:10px 22px; border-radius:20px; font-weight:600; cursor:pointer; font-family:'Kanit';">ส่ง ✈️</button>
                         </form>
